@@ -9,9 +9,19 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
-func TestTaskManager(t *testing.T) {
+var (
+	correctBatchId = "6a50032864056992563cee7e31b3323bd25ac34c157f658d02b32a59e241f7f3"
+	initialAmount  = "1234"
+)
+
+type mockResponse struct {
+	BatchID string `json:"batchID"`
+}
+
+func TestTopupTask(t *testing.T) {
 	stampInfo := &stamp{
 		BatchID: correctBatchId,
 		Amount:  initialAmount,
@@ -34,36 +44,35 @@ func TestTaskManager(t *testing.T) {
 	}))
 	defer svr.Close()
 
-	t.Run("enqueue task", func(t *testing.T) {
-		keeper := New(context.Background(), svr.URL)
-		err := keeper.Watch(correctBatchId, "45s")
-		if err != nil {
-			t.Fatal(err)
+	t.Run("topup wrong batch id", func(t *testing.T) {
+		wbi := "wrongBatchId"
+		_, err := NewTopupTask(context.Background(), wbi, svr.URL, time.Second*10)
+		if err == nil {
+			t.Fatal("wrong batch id check failed")
 		}
-
-		tasks := keeper.List()
-		if tasks[0] != correctBatchId {
-			t.Fatalf("batchId Mismatch. Got %s instead of %s ", tasks[0], correctBatchId)
-		}
-		keeper.Stop()
 	})
 
-	t.Run("dequeue task", func(t *testing.T) {
-		keeper := New(context.Background(), svr.URL)
-		err := keeper.Watch(correctBatchId, "45s")
+	t.Run("correct batch id", func(t *testing.T) {
+		topupTask, err := NewTopupTask(context.Background(), correctBatchId, svr.URL, time.Second*10)
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		err = keeper.Unwatch(correctBatchId)
-		if err != nil {
-			t.Fatal(err)
+		if topupTask.Name() != correctBatchId {
+			t.Fatal("task name mismatch")
 		}
 
-		tasks := keeper.List()
-		if len(tasks) != 0 {
-			t.Fatalf("there should not be any tasks in the worker")
+		go func() {
+			err = topupTask.Execute(context.Background())
+			if err != nil {
+				t.Error(err)
+				return
+			}
+		}()
+		// wait for first run
+		<-time.After(time.Second * 3)
+		topupTask.Stop()
+		if stampInfo.Amount != "10001234" {
+			t.Fatal("topup failed")
 		}
-		keeper.Stop()
 	})
 }

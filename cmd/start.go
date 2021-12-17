@@ -5,8 +5,6 @@ Copyright © 2021 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -14,9 +12,10 @@ import (
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start stampkeeper",
-	Long: `Start the stampkeeper to run in the background`,
+	Long:  `Start the stampkeeper to run in the background`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("start called")
+		// TODO add url flag, url defaults to local bee debug api
+		// Start new Keeper and wait for signal for stop
 	},
 }
 
