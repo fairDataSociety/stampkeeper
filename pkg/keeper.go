@@ -70,10 +70,13 @@ func (k *Keeper) Watch(name, batchId, balanceEndpoint, minBalance, topupBalance,
 func (k *Keeper) Unwatch(batchId string) error {
 	k.mtx.Lock()
 	defer k.mtx.Unlock()
-	task := k.tasks[batchId]
-	task.Stop()
-	delete(k.tasks, batchId)
-	return nil
+	if k.tasks[batchId] != nil {
+		task := k.tasks[batchId]
+		task.Stop()
+		delete(k.tasks, batchId)
+		return nil
+	}
+	return fmt.Errorf("stampkeeper not running for this batch id")
 }
 
 func (k *Keeper) List() []string {

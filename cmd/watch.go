@@ -5,7 +5,12 @@ Copyright © 2021 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
+
+	uds "github.com/asabya/go-ipc-uds"
+
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -21,7 +26,10 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 		Run: func(cmd *cobra.Command, args []string) {
-
+			if !uds.IsIPCListening(socketPath) {
+				cmd.Println("Please start the keeper to run this command")
+				return
+			}
 			batchId, err := cmd.Flags().GetString("batch")
 			if err != nil {
 				cmd.Printf("Failed to read batch flag %s\n", err.Error())
@@ -86,6 +94,19 @@ to quickly create a Cobra application.`,
 				cmd.Printf("Failed to watch %s: %s\n", batchId, err.Error())
 				return
 			}
+			conf := map[string]string{}
+			conf["name"] = name
+			conf["interval"] = interval
+			conf["url"] = url
+			conf["min"] = minBalance
+			conf["top"] = topupAmount
+			conf["active"] = "true"
+
+			viper.Set(fmt.Sprintf("batches.%s", batchId), conf)
+			if err := viper.WriteConfig(); err != nil {
+				cmd.Printf("Failed to write config with batchId info %s: %s\n", batchId, err.Error())
+				return
+			}
 			cmd.Printf("Successfully started stampkeeping on %s\n", batchId)
 		},
 	}
@@ -98,6 +119,6 @@ func init() {
 	watchCmd.Flags().String("batch", "", "BatchId to topup")
 	watchCmd.Flags().String("interval", "30s", "Interval to check for balance")
 	watchCmd.Flags().String("url", "", "Endpoint to check balance")
-	watchCmd.Flags().String("min", "10000", "Minimum balance for topup")
-	watchCmd.Flags().String("top", "1000000", "Amount to be topped up")
+	watchCmd.Flags().String("min", "2000000", "Minimum balance for topup")
+	watchCmd.Flags().String("top", "5000000", "Amount to be topped up")
 }

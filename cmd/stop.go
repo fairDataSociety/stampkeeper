@@ -5,6 +5,7 @@ Copyright © 2021 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	uds "github.com/asabya/go-ipc-uds"
 	"github.com/spf13/cobra"
 )
 
@@ -19,10 +20,14 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Println("stop called")
+		if !uds.IsIPCListening(socketPath) {
+			cmd.Println("Please start the keeper to run this command")
+			return
+		}
 		if cancel != nil {
 			cancel()
 		}
+		cmd.Println("Stopped stampkeeper")
 	},
 }
 

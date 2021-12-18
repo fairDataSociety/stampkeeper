@@ -25,13 +25,13 @@ const (
 )
 
 var (
-	cfgFile  string
-	log      = logging.Logger("cmd")
-	keeper   *pkg.Keeper
-	ctx      context.Context
-	cancel   context.CancelFunc
-	sockPath = "stampkeeper.sock"
-
+	cfgFile    string
+	log        = logging.Logger("cmd")
+	keeper     *pkg.Keeper
+	ctx        context.Context
+	cancel     context.CancelFunc
+	sockPath   = "stampkeeper.sock"
+	socketPath string
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
 		Use:   "stampkeeper",
@@ -45,7 +45,7 @@ swarm postage stamps, top them up and avoid depletion.`,
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	tmp := os.TempDir()
-	socketPath := filepath.Join(tmp, sockPath)
+	socketPath = filepath.Join(tmp, sockPath)
 	ctx, cancel = context.WithCancel(context.Background())
 	if !uds.IsIPCListening(socketPath) {
 		keeper = pkg.New(ctx, server)
@@ -237,11 +237,11 @@ func initConfig() {
 
 	// If config file is not present, write it
 	if err := viper.SafeWriteConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		log.Info(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		log.Info(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 }

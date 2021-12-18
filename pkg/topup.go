@@ -93,12 +93,17 @@ func (t *Topup) Execute(context.Context) error {
 			log.Error(err)
 			return err
 		}
+		if resp.StatusCode != 200 {
+			log.Error(string(body))
+			return fmt.Errorf("%s %s", body, t.batchId)
+		}
 		s := &stamp{}
 		err = json.Unmarshal(body, s)
 		if err != nil {
 			log.Error(err)
 			return err
 		}
+
 		// check balance
 		amount := &big.Int{}
 		amount.SetString(s.Amount, 10)
@@ -121,7 +126,36 @@ func (t *Topup) Execute(context.Context) error {
 			}
 			if resp.StatusCode != 202 {
 				log.Errorf("failed to top up %s. got code %d\n", t.batchId, resp.StatusCode)
-				return fmt.Errorf("failed to top up %s. got code %d\n", t.batchId, resp.StatusCode)
+				continue
+			}
+			err = resp.Body.Close()
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+		}
+
+		// check depth
+		var used = float32(s.Utilization / (2 ^ (s.Depth - s.BucketDepth)))
+		if used > 0.8 {
+			client := &http.Client{}
+			url := fmt.Sprintf("%s/stamps/dilute/%s/%d", t.url, t.batchId, s.Depth+2)
+
+			req, err := http.NewRequest(http.MethodPatch, url, nil)
+			req.Header.Set("Content-Type", "application/json")
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+
+			resp, err = client.Do(req)
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+			if resp.StatusCode != 202 {
+				log.Errorf("failed to dilute %s. got code %d\n", t.batchId, resp.StatusCode)
+				continue
 			}
 			err = resp.Body.Close()
 			if err != nil {
