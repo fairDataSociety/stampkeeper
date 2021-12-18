@@ -14,16 +14,21 @@ import (
 )
 
 var (
-	log               = logging.Logger("stampkeeper/pkg")
-	topupAmount int64 = 10000000
+	log = logging.Logger("stampkeeper/pkg")
 )
 
 type Topup struct {
-	ctx      context.Context
-	cancel   context.CancelFunc
-	batchId  string
-	interval time.Duration
-	url      string
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	batchId         string
+	interval        time.Duration
+	url             string
+	balanceEndpoint string
+	name            string
+	minAmount       *big.Int
+	topupAmount     *big.Int
+	active          bool
 }
 
 type stamp struct {
@@ -40,7 +45,7 @@ type stamp struct {
 	BatchTTL      int    `json:"batchTTL"`
 }
 
-func NewTopupTask(ctx context.Context, batchId, url string, interval time.Duration) (*Topup, error) {
+func newTopupTask(ctx context.Context, name, batchId, url, balanceEndpoint string, minAmount, topAmount *big.Int, interval time.Duration) (*Topup, error) {
 	if len(batchId) != 64 {
 		return nil, fmt.Errorf("invalid batchID")
 	}
@@ -50,11 +55,16 @@ func NewTopupTask(ctx context.Context, batchId, url string, interval time.Durati
 	}
 	ctx2, cancel := context.WithCancel(ctx)
 	return &Topup{
-		batchId:  batchId,
-		url:      url,
-		interval: interval,
-		ctx:      ctx2,
-		cancel:   cancel,
+		batchId:         batchId,
+		url:             url,
+		balanceEndpoint: balanceEndpoint,
+		name:            name,
+		minAmount:       minAmount,
+		topupAmount:     topAmount,
+		interval:        interval,
+		active:          true,
+		ctx:             ctx2,
+		cancel:          cancel,
 	}, nil
 }
 
@@ -92,10 +102,10 @@ func (t *Topup) Execute(context.Context) error {
 		// check balance
 		amount := &big.Int{}
 		amount.SetString(s.Amount, 10)
-		if amount.Cmp(big.NewInt(10000)) == -1 {
+		if amount.Cmp(t.minAmount) == -1 {
 			// topup
 			client := &http.Client{}
-			url := fmt.Sprintf("%s/stamps/topup/%s/%d", t.url, t.batchId, topupAmount)
+			url := fmt.Sprintf("%s/stamps/topup/%s/%d", t.url, t.batchId, t.topupAmount)
 
 			req, err := http.NewRequest(http.MethodPatch, url, nil)
 			req.Header.Set("Content-Type", "application/json")
@@ -128,7 +138,7 @@ func (t *Topup) Execute(context.Context) error {
 }
 
 func (t *Topup) Name() string {
-	return t.batchId
+	return t.name
 }
 
 func (t *Topup) Stop() {

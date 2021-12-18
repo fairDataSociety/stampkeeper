@@ -5,22 +5,44 @@ Copyright © 2021 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/fairDataSociety/stampkeeper/pkg"
 	"github.com/spf13/cobra"
 )
 
-// startCmd represents the start command
-var startCmd = &cobra.Command{
-	Use:   "start",
-	Short: "Start stampkeeper",
-	Long:  `Start the stampkeeper to run in the background`,
-	Run: func(cmd *cobra.Command, args []string) {
-		// TODO add url flag, url defaults to local bee debug api
-		// Start new Keeper and wait for signal for stop
-	},
-}
+var (
+	server string
+
+	// startCmd represents the start command
+	startCmd = &cobra.Command{
+		Use:   "start",
+		Short: "Start stampkeeper",
+		Long:  `Start the stampkeeper to run in the background`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if server == "" {
+				return fmt.Errorf("server endpoind is missing. please run \"--help\"")
+			}
+			keeper = pkg.New(ctx, server)
+
+			c := make(chan os.Signal, 1)
+			signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+			select {
+			case <-ctx.Done():
+			case <-c:
+				cancel()
+			}
+			return nil
+		},
+	}
+)
 
 func init() {
 	rootCmd.AddCommand(startCmd)
 
-	// startCmd.PersistentFlags().String("foo", "", "A help for foo")
+	startCmd.Flags().StringVar(&server, "server", "", "dfs server api endpoint")
 }

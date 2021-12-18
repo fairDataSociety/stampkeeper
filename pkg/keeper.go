@@ -2,6 +2,9 @@ package pkg
 
 import (
 	"context"
+	"fmt"
+	"math/big"
+	"strconv"
 	"sync"
 	"time"
 
@@ -29,12 +32,27 @@ func New(ctx context.Context, url string) *Keeper {
 	}
 }
 
-func (k *Keeper) Watch(batchId, interval string) error {
+func (k *Keeper) Watch(name, batchId, balanceEndpoint, minBalance, topupBalance, interval string) error {
+
+	if _, err := strconv.ParseInt(minBalance, 10, 64); err != nil {
+		return err
+	}
+	if _, err := strconv.ParseInt(topupBalance, 10, 64); err != nil {
+		return err
+	}
+
+	minAmount := &big.Int{}
+	minAmount.SetString(minBalance, 10)
+
+	topAmount := &big.Int{}
+	topAmount.SetString(topupBalance, 10)
+
 	intervalDuration, err := time.ParseDuration(interval)
 	if err != nil {
 		return err
 	}
-	task, err := NewTopupTask(k.ctx, batchId, k.url, intervalDuration)
+
+	task, err := newTopupTask(k.ctx, name, batchId, k.url, balanceEndpoint, minAmount, topAmount, intervalDuration)
 	if err != nil {
 		return err
 	}
@@ -62,7 +80,8 @@ func (k *Keeper) List() []string {
 	k.mtx.Lock()
 	defer k.mtx.Unlock()
 	tasks := []string{}
-	for i := range k.tasks {
+	for i, v := range k.tasks {
+		fmt.Println(v.Name())
 		tasks = append(tasks, i)
 	}
 	return tasks

@@ -30,7 +30,7 @@ func TestTopupTask(t *testing.T) {
 		if strings.HasPrefix(r.URL.String(), "/stamps/topup/") {
 			amount := &big.Int{}
 			amount.SetString(stampInfo.Amount, 10)
-			amount = amount.Add(amount, big.NewInt(topupAmount))
+			amount = amount.Add(amount, big.NewInt(10000000))
 			stampInfo.Amount = amount.String()
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(202)
@@ -46,18 +46,31 @@ func TestTopupTask(t *testing.T) {
 
 	t.Run("topup wrong batch id", func(t *testing.T) {
 		wbi := "wrongBatchId"
-		_, err := NewTopupTask(context.Background(), wbi, svr.URL, time.Second*10)
+
+		minAmount := &big.Int{}
+		minAmount.SetString("10000", 10)
+
+		topAmount := &big.Int{}
+		topAmount.SetString("10000000", 10)
+
+		_, err := newTopupTask(context.Background(), "batch1", wbi, svr.URL, svr.URL, minAmount, topAmount, time.Second*10)
 		if err == nil {
 			t.Fatal("wrong batch id check failed")
 		}
 	})
 
 	t.Run("correct batch id", func(t *testing.T) {
-		topupTask, err := NewTopupTask(context.Background(), correctBatchId, svr.URL, time.Second*10)
+		minAmount := &big.Int{}
+		minAmount.SetString("10000", 10)
+
+		topAmount := &big.Int{}
+		topAmount.SetString("10000000", 10)
+
+		topupTask, err := newTopupTask(context.Background(), "batch1", correctBatchId, svr.URL, svr.URL, minAmount, topAmount, time.Second*10)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if topupTask.Name() != correctBatchId {
+		if topupTask.Name() != "batch1" {
 			t.Fatal("task name mismatch")
 		}
 
@@ -76,3 +89,6 @@ func TestTopupTask(t *testing.T) {
 		}
 	})
 }
+
+// test for same name
+// test with multiple batchIds

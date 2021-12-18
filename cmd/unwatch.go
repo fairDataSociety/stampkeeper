@@ -5,8 +5,6 @@ Copyright © 2021 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -21,20 +19,29 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("unwatch called")
+		if keeper == nil {
+			cmd.Println("Please start the keeper to run this command")
+			return
+		}
+		batchId, err := cmd.Flags().GetString("batch")
+		if err != nil {
+			cmd.Printf("Failed to read batch flag %s\n", err.Error())
+			return
+		}
+		if batchId == "" {
+			cmd.Println("Please provide a valid batch id")
+			return
+		}
+		if err := keeper.Unwatch(batchId); err != nil {
+			cmd.Printf("Failed to watch %s: %s\n", batchId, err.Error())
+			return
+		}
+		cmd.Printf("Successfully stopped stampkeeping on %s\n", batchId)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(unwatchCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// unwatchCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// unwatchCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	unwatchCmd.Flags().String("batch", "", "BatchId to unwatch")
 }

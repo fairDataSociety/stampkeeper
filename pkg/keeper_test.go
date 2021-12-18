@@ -20,7 +20,7 @@ func TestTaskManager(t *testing.T) {
 		if strings.HasPrefix(r.URL.String(), "/stamps/topup/") {
 			amount := &big.Int{}
 			amount.SetString(stampInfo.Amount, 10)
-			amount = amount.Add(amount, big.NewInt(topupAmount))
+			amount = amount.Add(amount, big.NewInt(10000000))
 			stampInfo.Amount = amount.String()
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(202)
@@ -36,7 +36,7 @@ func TestTaskManager(t *testing.T) {
 
 	t.Run("enqueue task", func(t *testing.T) {
 		keeper := New(context.Background(), svr.URL)
-		err := keeper.Watch(correctBatchId, "45s")
+		err := keeper.Watch("batch1", correctBatchId, keeper.url, "1", "2", "45s")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -50,7 +50,7 @@ func TestTaskManager(t *testing.T) {
 
 	t.Run("dequeue task", func(t *testing.T) {
 		keeper := New(context.Background(), svr.URL)
-		err := keeper.Watch(correctBatchId, "45s")
+		err := keeper.Watch("batch1", correctBatchId, keeper.url, "1", "2", "45s")
 		if err != nil {
 			t.Fatal(err)
 		}
