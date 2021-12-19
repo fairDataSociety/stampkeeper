@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"math/big"
 	"net/http"
 	"time"
@@ -29,6 +30,20 @@ type Topup struct {
 	minAmount       *big.Int
 	topupAmount     *big.Int
 	active          bool
+
+	startedAt int64
+	stoppedAt int64
+
+	actions []action
+}
+
+type action struct {
+	name            string
+	previousBalance string
+	previousDepth   int
+	doneAt          int64
+	depthAdded      int
+	amountTopped    string
 }
 
 type stamp struct {
@@ -65,6 +80,8 @@ func newTopupTask(ctx context.Context, name, batchId, url, balanceEndpoint strin
 		active:          true,
 		ctx:             ctx2,
 		cancel:          cancel,
+
+		actions: []action{},
 	}, nil
 }
 
@@ -72,10 +89,12 @@ func (t *Topup) Execute(context.Context) error {
 	var resp *http.Response
 	var err error
 	defer func() {
+		t.stoppedAt = time.Now().Unix()
 		if resp != nil {
 			resp.Body.Close()
 		}
 	}()
+	t.startedAt = time.Now().Unix()
 	for {
 		// get balance
 		resp, err = http.Get(fmt.Sprintf("%s/stamps/%s", t.url, t.batchId))
@@ -133,10 +152,19 @@ func (t *Topup) Execute(context.Context) error {
 				log.Error(err)
 				return err
 			}
+
+			t.actions = append(t.actions, action{
+				name:            "topup",
+				previousBalance: s.Amount,
+				previousDepth:   s.Depth,
+				doneAt:          time.Now().Unix(),
+				amountTopped:    t.topupAmount.String(),
+			})
 		}
 
 		// check depth
-		var used = float32(s.Utilization / (2 ^ (s.Depth - s.BucketDepth)))
+		d := math.Exp2(float64(s.Depth - s.BucketDepth))
+		var used = float64(s.Utilization) / d
 		if used > 0.8 {
 			client := &http.Client{}
 			url := fmt.Sprintf("%s/stamps/dilute/%s/%d", t.url, t.batchId, s.Depth+2)
@@ -162,6 +190,13 @@ func (t *Topup) Execute(context.Context) error {
 				log.Error(err)
 				return err
 			}
+			t.actions = append(t.actions, action{
+				name:            "dilute",
+				previousBalance: s.Amount,
+				previousDepth:   s.Depth,
+				doneAt:          time.Now().Unix(),
+				depthAdded:      2,
+			})
 		}
 		select {
 		case <-time.After(t.interval):

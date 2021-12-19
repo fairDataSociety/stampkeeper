@@ -47,7 +47,7 @@ to quickly create a Cobra application.`,
 		}
 		cmd.Printf("Successfully stopped stampkeeping on %s\n", batchId)
 		b := viper.Get(fmt.Sprintf("batches.%s", batchId))
-		a := b.(map[string]string)
+		a := b.(map[string]interface{})
 		a["active"] = "false"
 		viper.Set(fmt.Sprintf("batches.%s", batchId), a)
 		if err := viper.WriteConfig(); err != nil {

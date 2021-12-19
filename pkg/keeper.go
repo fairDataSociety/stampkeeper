@@ -83,8 +83,7 @@ func (k *Keeper) List() []string {
 	k.mtx.Lock()
 	defer k.mtx.Unlock()
 	tasks := []string{}
-	for i, v := range k.tasks {
-		fmt.Println(v.Name())
+	for i, _ := range k.tasks {
 		tasks = append(tasks, i)
 	}
 	return tasks
