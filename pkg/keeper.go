@@ -89,6 +89,20 @@ func (k *Keeper) List() []string {
 	return tasks
 }
 
+func (k *Keeper) GetTaskInfo(batchId string) (map[string]interface{}, error) {
+	k.mtx.Lock()
+	defer k.mtx.Unlock()
+	info := map[string]interface{}{}
+	if k.tasks[batchId] != nil {
+		info["batch"] = batchId
+		info["balance"] = batchId
+		info["depth"] = batchId
+		info["actions"] = k.tasks[batchId].GetActions()
+		return info, nil
+	}
+	return nil, fmt.Errorf("stampkeeper not running for this batch id")
+}
+
 func (k *Keeper) Stop() {
 	k.cancel()
 }

@@ -34,16 +34,16 @@ type Topup struct {
 	startedAt int64
 	stoppedAt int64
 
-	actions []action
+	actions []Action
 }
 
-type action struct {
-	name            string
-	previousBalance string
-	previousDepth   int
-	doneAt          int64
-	depthAdded      int
-	amountTopped    string
+type Action struct {
+	Name            string
+	PreviousBalance string
+	PreviousDepth   int
+	DoneAt          int64
+	DepthAdded      int
+	AmountTopped    string
 }
 
 type stamp struct {
@@ -81,7 +81,7 @@ func newTopupTask(ctx context.Context, name, batchId, url, balanceEndpoint strin
 		ctx:             ctx2,
 		cancel:          cancel,
 
-		actions: []action{},
+		actions: []Action{},
 	}, nil
 }
 
@@ -153,12 +153,12 @@ func (t *Topup) Execute(context.Context) error {
 				return err
 			}
 
-			t.actions = append(t.actions, action{
-				name:            "topup",
-				previousBalance: s.Amount,
-				previousDepth:   s.Depth,
-				doneAt:          time.Now().Unix(),
-				amountTopped:    t.topupAmount.String(),
+			t.actions = append(t.actions, Action{
+				Name:            "topup",
+				PreviousBalance: s.Amount,
+				PreviousDepth:   s.Depth,
+				DoneAt:          time.Now().Unix(),
+				AmountTopped:    t.topupAmount.String(),
 			})
 		}
 
@@ -166,6 +166,32 @@ func (t *Topup) Execute(context.Context) error {
 		d := math.Exp2(float64(s.Depth - s.BucketDepth))
 		var used = float64(s.Utilization) / d
 		if used > 0.8 {
+			resp, err = http.Get(fmt.Sprintf("%s/stamps/%s", t.url, t.batchId))
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+			err = resp.Body.Close()
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+			if resp.StatusCode != 200 {
+				log.Error(string(body))
+				return fmt.Errorf("%s %s", body, t.batchId)
+			}
+			s := &stamp{}
+			err = json.Unmarshal(body, s)
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+
 			client := &http.Client{}
 			url := fmt.Sprintf("%s/stamps/dilute/%s/%d", t.url, t.batchId, s.Depth+2)
 
@@ -190,12 +216,12 @@ func (t *Topup) Execute(context.Context) error {
 				log.Error(err)
 				return err
 			}
-			t.actions = append(t.actions, action{
-				name:            "dilute",
-				previousBalance: s.Amount,
-				previousDepth:   s.Depth,
-				doneAt:          time.Now().Unix(),
-				depthAdded:      2,
+			t.actions = append(t.actions, Action{
+				Name:            "dilute",
+				PreviousBalance: s.Amount,
+				PreviousDepth:   s.Depth,
+				DoneAt:          time.Now().Unix(),
+				DepthAdded:      2,
 			})
 		}
 		select {
@@ -212,4 +238,8 @@ func (t *Topup) Name() string {
 
 func (t *Topup) Stop() {
 	t.cancel()
+}
+
+func (t *Topup) GetActions() []Action {
+	return t.actions
 }

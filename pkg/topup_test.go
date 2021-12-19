@@ -83,7 +83,7 @@ func TestTopupTask(t *testing.T) {
 			t.Fatal(err)
 		}
 		if topupTask.Name() != "batch1" {
-			t.Fatal("task name mismatch")
+			t.Fatal("task Name mismatch")
 		}
 		go func() {
 			err = topupTask.Execute(context.Background())
@@ -101,14 +101,14 @@ func TestTopupTask(t *testing.T) {
 		}
 
 		actions := topupTask.actions
-		if actions[0].name != "topup" {
-			t.Fatal("first action should be topup")
+		if actions[0].Name != "topup" {
+			t.Fatal("first Action should be topup")
 		}
-		if actions[1].name != "dilute" {
-			t.Fatal("second action should be dilute")
+		if actions[1].Name != "dilute" {
+			t.Fatal("second Action should be dilute")
 		}
 	})
 }
 
-// test for same name
-// test with multiple batchIds
+// TODO test for same Name
+// TODO test with multiple batchIds
