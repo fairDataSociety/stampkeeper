@@ -1,10 +1,14 @@
 /*
-Copyright © 2021 NAME HERE <EMAIL ADDRESS>
+MIT License
+
+Copyright (c) 2021 Fair Data Society
 
 */
 package cmd
 
 import (
+	"encoding/json"
+
 	uds "github.com/asabya/go-ipc-uds"
 	"github.com/spf13/cobra"
 )
@@ -29,7 +33,12 @@ to quickly create a Cobra application.`,
 			return
 		}
 		list := keeper.List()
-		cmd.Println(list)
+		b, err := json.MarshalIndent(list, "", "\t")
+		if err != nil {
+			cmd.Println("Failed to read batch list")
+			return
+		}
+		cmd.Println(string(b))
 	},
 }
 

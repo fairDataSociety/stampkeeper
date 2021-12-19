@@ -1,3 +1,9 @@
+/*
+MIT License
+
+Copyright (c) 2021 Fair Data Society
+
+*/
 package pkg
 
 import (
@@ -72,19 +78,23 @@ func (k *Keeper) Unwatch(batchId string) error {
 	defer k.mtx.Unlock()
 	if k.tasks[batchId] != nil {
 		task := k.tasks[batchId]
+		task.active = false
 		task.Stop()
-		delete(k.tasks, batchId)
 		return nil
 	}
 	return fmt.Errorf("stampkeeper not running for this batch id")
 }
 
-func (k *Keeper) List() []string {
+func (k *Keeper) List() []interface{} {
 	k.mtx.Lock()
 	defer k.mtx.Unlock()
-	tasks := []string{}
-	for i, _ := range k.tasks {
-		tasks = append(tasks, i)
+	tasks := []interface{}{}
+	for i, v := range k.tasks {
+		info := map[string]interface{}{}
+		info["batch"] = i
+		info["active"] = v.active
+		info["actions"] = v.GetActions()
+		tasks = append(tasks, info)
 	}
 	return tasks
 }
@@ -95,8 +105,6 @@ func (k *Keeper) GetTaskInfo(batchId string) (map[string]interface{}, error) {
 	info := map[string]interface{}{}
 	if k.tasks[batchId] != nil {
 		info["batch"] = batchId
-		info["balance"] = batchId
-		info["depth"] = batchId
 		info["actions"] = k.tasks[batchId].GetActions()
 		return info, nil
 	}

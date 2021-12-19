@@ -1,5 +1,7 @@
 /*
-Copyright © 2021 NAME HERE <EMAIL ADDRESS>
+MIT License
+
+Copyright (c) 2021 Fair Data Society
 
 */
 package cmd

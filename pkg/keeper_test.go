@@ -55,8 +55,9 @@ func TestTaskManager(t *testing.T) {
 		}
 
 		tasks := keeper.List()
-		if tasks[0] != correctBatchId {
-			t.Fatalf("batchId Mismatch. Got %s instead of %s ", tasks[0], correctBatchId)
+		v := tasks[0].(map[string]interface{})
+		if v["active"] != true {
+			t.Fatalf("there should not be any tasks in the worker")
 		}
 		keeper.Stop()
 	})
@@ -74,7 +75,8 @@ func TestTaskManager(t *testing.T) {
 		}
 
 		tasks := keeper.List()
-		if len(tasks) != 0 {
+		v := tasks[0].(map[string]interface{})
+		if v["active"] != false {
 			t.Fatalf("there should not be any tasks in the worker")
 		}
 		keeper.Stop()

@@ -1,3 +1,9 @@
+/*
+MIT License
+
+Copyright (c) 2021 Fair Data Society
+
+*/
 package pkg
 
 import (

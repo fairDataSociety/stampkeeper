@@ -1,10 +1,18 @@
 /*
-Copyright © 2021 NAME HERE <EMAIL ADDRESS>
+MIT License
+
+Copyright (c) 2021 Fair Data Society
 
 */
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
 	uds "github.com/asabya/go-ipc-uds"
 	"github.com/spf13/cobra"
 )
@@ -24,10 +32,37 @@ to quickly create a Cobra application.`,
 			cmd.Println("Please start the keeper to run this command")
 			return
 		}
-		if cancel != nil {
-			cancel()
+		defer func() {
+			if cancel != nil {
+				cancel()
+			}
+		}()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			cmd.Println("Failed to create funding history")
+			return
 		}
-		cmd.Println("Stopped stampkeeper")
+		filename := filepath.Join(home, fmt.Sprintf("stampkeeper_history_%d.json", time.Now().Unix()))
+		f, err := os.Create(filename)
+		if err != nil {
+			cmd.Println("Failed to create funding history")
+			return
+		}
+		defer f.Close()
+		list := keeper.List()
+		b, err := json.MarshalIndent(list, "", "\t")
+		if err != nil {
+			cmd.Println("Failed to read batch list")
+			return
+		}
+
+		_, err = f.Write(b)
+		if err != nil {
+			cmd.Println("Failed to create funding history")
+			return
+		}
+
+		cmd.Println("Stopped stampkeeper. Topup history saved in ", filename)
 	},
 }
 
