@@ -15,6 +15,7 @@ import (
 	"math"
 	"math/big"
 	"net/http"
+	"sync"
 	"time"
 
 	logging "github.com/ipfs/go-log/v2"
@@ -41,6 +42,8 @@ type Topup struct {
 	stoppedAt int64
 
 	actions []Action
+
+	mtx sync.Mutex
 }
 
 type Action struct {
@@ -158,7 +161,7 @@ func (t *Topup) Execute(context.Context) error {
 				log.Error(err)
 				return err
 			}
-
+			t.mtx.Lock()
 			t.actions = append(t.actions, Action{
 				Name:            "topup",
 				PreviousBalance: s.Amount,
@@ -166,6 +169,7 @@ func (t *Topup) Execute(context.Context) error {
 				DoneAt:          time.Now().Unix(),
 				AmountTopped:    t.topupAmount.String(),
 			})
+			t.mtx.Unlock()
 		}
 
 		// check depth
@@ -222,6 +226,7 @@ func (t *Topup) Execute(context.Context) error {
 				log.Error(err)
 				return err
 			}
+			t.mtx.Lock()
 			t.actions = append(t.actions, Action{
 				Name:            "dilute",
 				PreviousBalance: s.Amount,
@@ -229,6 +234,7 @@ func (t *Topup) Execute(context.Context) error {
 				DoneAt:          time.Now().Unix(),
 				DepthAdded:      2,
 			})
+			t.mtx.Unlock()
 		}
 		select {
 		case <-time.After(t.interval):
@@ -247,5 +253,7 @@ func (t *Topup) Stop() {
 }
 
 func (t *Topup) GetActions() []Action {
+	t.mtx.Lock()
+	defer t.mtx.Unlock()
 	return t.actions
 }
