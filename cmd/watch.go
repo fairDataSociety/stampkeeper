@@ -20,13 +20,9 @@ var (
 	// watchCmd represents the watch command
 	watchCmd = &cobra.Command{
 		Use:   "watch",
-		Short: "A brief description of your command",
-		Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+		Short: "Watch a batch",
+		Long: `Watch will start a worker and keep watching the stamp
+based on the provided parameters`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !uds.IsIPCListening(socketPath) {
 				cmd.Println("Please start the keeper to run this command")
