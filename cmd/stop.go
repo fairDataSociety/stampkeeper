@@ -1,27 +1,63 @@
 /*
-Copyright © 2021 NAME HERE <EMAIL ADDRESS>
+MIT License
+
+Copyright (c) 2021 Fair Data Society
 
 */
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"time"
 
+	uds "github.com/asabya/go-ipc-uds"
 	"github.com/spf13/cobra"
 )
 
 // stopCmd represents the stop command
 var stopCmd = &cobra.Command{
 	Use:   "stop",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Stop stampkeeper",
+	Long:  `Stops The stampkeeper and all the watchers`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("stop called")
+		if !uds.IsIPCListening(socketPath) {
+			cmd.Println("Please start the keeper to run this command")
+			return
+		}
+		defer func() {
+			if cancel != nil {
+				cancel()
+			}
+		}()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			cmd.Println("Failed to create funding history")
+			return
+		}
+		filename := filepath.Join(home, fmt.Sprintf("stampkeeper_history_%d.json", time.Now().Unix()))
+		f, err := os.Create(filename)
+		if err != nil {
+			cmd.Println("Failed to create funding history")
+			return
+		}
+		defer f.Close()
+		list := keeper.List()
+		b, err := json.MarshalIndent(list, "", "\t")
+		if err != nil {
+			cmd.Println("Failed to read batch list")
+			return
+		}
+
+		_, err = f.Write(b)
+		if err != nil {
+			cmd.Println("Failed to create funding history")
+			return
+		}
+
+		cmd.Println("Stopped stampkeeper. Topup history saved in ", filename)
 	},
 }
 

@@ -8,26 +8,47 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestTaskManager(t *testing.T) {
+	var mtx sync.Mutex
 	stampInfo := &stamp{
-		BatchID: correctBatchId,
-		Amount:  initialAmount,
+		BatchID:     correctBatchId,
+		Amount:      initialAmount,
+		Utilization: 16,
+		Depth:       20,
+		BucketDepth: 16,
 	}
 	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.String(), "/stamps/topup/") {
+			mtx.Lock()
 			amount := &big.Int{}
 			amount.SetString(stampInfo.Amount, 10)
-			amount = amount.Add(amount, big.NewInt(topupAmount))
+			amount = amount.Add(amount, big.NewInt(10000000))
 			stampInfo.Amount = amount.String()
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(202)
 			_ = json.NewEncoder(w).Encode(&mockResponse{BatchID: stampInfo.BatchID})
+			mtx.Unlock()
+		} else if strings.HasPrefix(r.URL.String(), "/stamps/dilute/") {
+			mtx.Lock()
+			amount := &big.Int{}
+			amount.SetString(stampInfo.Amount, 10)
+			amount = amount.Sub(amount, big.NewInt(5000000))
+			stampInfo.Amount = amount.String()
+			stampInfo.Depth = stampInfo.Depth + 2
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(202)
+			_ = json.NewEncoder(w).Encode(&mockResponse{BatchID: stampInfo.BatchID})
+			mtx.Unlock()
 		} else if strings.HasPrefix(r.URL.String(), "/stamps/") {
+			mtx.Lock()
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(stampInfo)
+			mtx.Unlock()
 		} else {
 			fmt.Println()
 		}
@@ -36,21 +57,22 @@ func TestTaskManager(t *testing.T) {
 
 	t.Run("enqueue task", func(t *testing.T) {
 		keeper := New(context.Background(), svr.URL)
-		err := keeper.Watch(correctBatchId, "45s")
+		err := keeper.Watch("batch1", correctBatchId, keeper.url, "1", "2", "45s")
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		tasks := keeper.List()
-		if tasks[0] != correctBatchId {
-			t.Fatalf("batchId Mismatch. Got %s instead of %s ", tasks[0], correctBatchId)
+		v := tasks[0].(map[string]interface{})
+		if v["active"] != true {
+			t.Fatalf("there should not be any tasks in the worker")
 		}
 		keeper.Stop()
 	})
 
 	t.Run("dequeue task", func(t *testing.T) {
 		keeper := New(context.Background(), svr.URL)
-		err := keeper.Watch(correctBatchId, "45s")
+		err := keeper.Watch("batch1", correctBatchId, keeper.url, "1", "2", "2s")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -61,8 +83,35 @@ func TestTaskManager(t *testing.T) {
 		}
 
 		tasks := keeper.List()
-		if len(tasks) != 0 {
+		v := tasks[0].(map[string]interface{})
+		if v["active"] != false {
 			t.Fatalf("there should not be any tasks in the worker")
+		}
+		keeper.Stop()
+	})
+
+	t.Run("task actions", func(t *testing.T) {
+		keeper := New(context.Background(), svr.URL)
+		err := keeper.Watch("batch1", correctBatchId, keeper.url, "10000", "10000000", "10s")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		<-time.After(time.Second * 2)
+		info, err := keeper.GetTaskInfo(correctBatchId)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info["batch"] != correctBatchId {
+			t.Fatal("batchId mismatch")
+		}
+		actions := info["actions"].([]Action)
+
+		if actions[0].Name != "topup" {
+			t.Fatal("first Action should be topup")
+		}
+		if actions[1].Name != "dilute" {
+			t.Fatal("second Action should be dilute")
 		}
 		keeper.Stop()
 	})
