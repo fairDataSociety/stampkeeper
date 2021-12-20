@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
 func TestTaskManager(t *testing.T) {
+	var mtx sync.Mutex
 	stampInfo := &stamp{
 		BatchID:     correctBatchId,
 		Amount:      initialAmount,
@@ -22,6 +24,7 @@ func TestTaskManager(t *testing.T) {
 	}
 	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.String(), "/stamps/topup/") {
+			mtx.Lock()
 			amount := &big.Int{}
 			amount.SetString(stampInfo.Amount, 10)
 			amount = amount.Add(amount, big.NewInt(10000000))
@@ -29,7 +32,9 @@ func TestTaskManager(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(202)
 			_ = json.NewEncoder(w).Encode(&mockResponse{BatchID: stampInfo.BatchID})
+			mtx.Unlock()
 		} else if strings.HasPrefix(r.URL.String(), "/stamps/dilute/") {
+			mtx.Lock()
 			amount := &big.Int{}
 			amount.SetString(stampInfo.Amount, 10)
 			amount = amount.Sub(amount, big.NewInt(5000000))
@@ -38,9 +43,12 @@ func TestTaskManager(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(202)
 			_ = json.NewEncoder(w).Encode(&mockResponse{BatchID: stampInfo.BatchID})
+			mtx.Unlock()
 		} else if strings.HasPrefix(r.URL.String(), "/stamps/") {
+			mtx.Lock()
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(stampInfo)
+			mtx.Unlock()
 		} else {
 			fmt.Println()
 		}
@@ -84,12 +92,12 @@ func TestTaskManager(t *testing.T) {
 
 	t.Run("task actions", func(t *testing.T) {
 		keeper := New(context.Background(), svr.URL)
-		err := keeper.Watch("batch1", correctBatchId, keeper.url, "10000", "10000000", "1s")
+		err := keeper.Watch("batch1", correctBatchId, keeper.url, "10000", "10000000", "10s")
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		<-time.After(time.Second * 5)
+		<-time.After(time.Second * 2)
 		info, err := keeper.GetTaskInfo(correctBatchId)
 		if err != nil {
 			t.Fatal(err)
