@@ -84,7 +84,7 @@ func TestTaskManager(t *testing.T) {
 
 	t.Run("task actions", func(t *testing.T) {
 		keeper := New(context.Background(), svr.URL)
-		err := keeper.Watch("batch1", correctBatchId, keeper.url, "10000", "10000000", "2s")
+		err := keeper.Watch("batch1", correctBatchId, keeper.url, "10000", "10000000", "1s")
 		if err != nil {
 			t.Fatal(err)
 		}
