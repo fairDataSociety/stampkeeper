@@ -4,7 +4,6 @@ go 1.17
 
 require (
 	github.com/asabya/go-ipc-uds v0.1.1
-	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/ipfs/go-log/v2 v2.3.0
 	github.com/plexsysio/taskmanager v0.0.0-20210723134040-a2edfdf0dcbd
 	github.com/spf13/cobra v1.3.0
