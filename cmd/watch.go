@@ -7,7 +7,10 @@ Copyright (c) 2021 Fair Data Society
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	uds "github.com/asabya/go-ipc-uds"
 	"github.com/fairDataSociety/stampkeeper/pkg"
@@ -87,9 +90,28 @@ based on the provided parameters`,
 				cmd.Println("Please start the keeper to run this command")
 				return
 			}
+			home, err := os.UserHomeDir()
+			if err != nil {
+				cmd.Println("Failed to get home location")
+				return
+			}
 			cb := func(a *pkg.TopupAction) error {
 				// do something with action
 				logger.Infof("Got action %+v", a)
+				f, err := os.OpenFile(filepath.Join(home, accountant), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+				if err != nil {
+					return err
+				}
+
+				defer f.Close()
+				b, err := json.Marshal(a)
+				if err != nil {
+					return err
+				}
+
+				if _, err = f.WriteString(fmt.Sprintf("%s\n", b)); err != nil {
+					return err
+				}
 				return nil
 			}
 			if err := keeper.Watch(name, batchId, url, minBalance, topupAmount, interval, cb); err != nil {

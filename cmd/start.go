@@ -7,9 +7,11 @@ Copyright (c) 2021 Fair Data Society
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/fairDataSociety/stampkeeper/pkg"
@@ -30,9 +32,28 @@ var (
 				return fmt.Errorf("server endpoind is missing. please run \"--help\"")
 			}
 
+			home, err := os.UserHomeDir()
+			if err != nil {
+				cmd.Println("Failed to get home location")
+				return err
+			}
 			cb := func(a *pkg.TopupAction) error {
 				// do something with action
 				logger.Infof("Got action %+v", a)
+				f, err := os.OpenFile(filepath.Join(home, accountant), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+				if err != nil {
+					return err
+				}
+
+				defer f.Close()
+				b, err := json.Marshal(a)
+				if err != nil {
+					return err
+				}
+
+				if _, err = f.WriteString(fmt.Sprintf("%s\n", b)); err != nil {
+					return err
+				}
 				return nil
 			}
 			keeper = pkg.New(ctx, server, logger)

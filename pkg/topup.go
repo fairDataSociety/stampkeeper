@@ -42,7 +42,9 @@ type TopupAction struct {
 	Name            string
 	BatchID         string
 	PreviousBalance string
+	CurrentBalance  string
 	PreviousDepth   int
+	CurrentDepth    int
 	DoneAt          int64
 	DepthAdded      int
 	AmountTopped    string
@@ -90,7 +92,6 @@ func newTopupTask(ctx context.Context, name, batchId, url, balanceEndpoint strin
 
 func (t *Topup) Execute(context.Context) error {
 	var resp *http.Response
-	var err error
 	defer func() {
 		t.stoppedAt = time.Now().Unix()
 		if resp != nil {
@@ -100,27 +101,7 @@ func (t *Topup) Execute(context.Context) error {
 	t.startedAt = time.Now().Unix()
 	for {
 		// get balance
-		resp, err = http.Get(fmt.Sprintf("%s/stamps/%s", t.url, t.batchId))
-		if err != nil {
-			t.logger.Error(err)
-			return err
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.logger.Error(err)
-			return err
-		}
-		err = resp.Body.Close()
-		if err != nil {
-			t.logger.Error(err)
-			return err
-		}
-		if resp.StatusCode != 200 {
-			t.logger.Error(string(body))
-			return fmt.Errorf("%s %s", body, t.batchId)
-		}
-		s := &stamp{}
-		err = json.Unmarshal(body, s)
+		s, err := t.getStamp()
 		if err != nil {
 			t.logger.Error(err)
 			return err
@@ -150,7 +131,13 @@ func (t *Topup) Execute(context.Context) error {
 				t.logger.Errorf("failed to top up %s. got code %d\n", t.batchId, resp.StatusCode)
 				continue
 			}
+
 			err = resp.Body.Close()
+			if err != nil {
+				t.logger.Error(err)
+				return err
+			}
+			sNew, err := t.getStamp()
 			if err != nil {
 				t.logger.Error(err)
 				return err
@@ -160,6 +147,8 @@ func (t *Topup) Execute(context.Context) error {
 				Name:            "topup",
 				PreviousBalance: s.Amount,
 				PreviousDepth:   s.Depth,
+				CurrentBalance:  sNew.Amount,
+				CurrentDepth:    sNew.Depth,
 				DoneAt:          time.Now().Unix(),
 				AmountTopped:    t.topupAmount.String(),
 			}
@@ -174,27 +163,7 @@ func (t *Topup) Execute(context.Context) error {
 		d := math.Exp2(float64(s.Depth - s.BucketDepth))
 		var used = float64(s.Utilization) / d
 		if used > 0.8 {
-			resp, err = http.Get(fmt.Sprintf("%s/stamps/%s", t.url, t.batchId))
-			if err != nil {
-				t.logger.Error(err)
-				return err
-			}
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				t.logger.Error(err)
-				return err
-			}
-			err = resp.Body.Close()
-			if err != nil {
-				t.logger.Error(err)
-				return err
-			}
-			if resp.StatusCode != 200 {
-				t.logger.Error(string(body))
-				return fmt.Errorf("%s %s", body, t.batchId)
-			}
-			s := &stamp{}
-			err = json.Unmarshal(body, s)
+			s, err = t.getStamp()
 			if err != nil {
 				t.logger.Error(err)
 				return err
@@ -224,11 +193,18 @@ func (t *Topup) Execute(context.Context) error {
 				t.logger.Error(err)
 				return err
 			}
+			sNew, err := t.getStamp()
+			if err != nil {
+				t.logger.Error(err)
+				return err
+			}
 			action := &TopupAction{
 				BatchID:         t.batchId,
 				Name:            "dilute",
 				PreviousBalance: s.Amount,
 				PreviousDepth:   s.Depth,
+				CurrentBalance:  sNew.Amount,
+				CurrentDepth:    sNew.Depth,
 				DoneAt:          time.Now().Unix(),
 				DepthAdded:      2,
 			}
@@ -253,4 +229,34 @@ func (t *Topup) Name() string {
 
 func (t *Topup) Stop() {
 	t.cancel()
+}
+
+func (t *Topup) getStamp() (*stamp, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/stamps/%s", t.url, t.batchId))
+	if err != nil {
+		t.logger.Error(err)
+		return nil, err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.logger.Error(err)
+		return nil, err
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		t.logger.Error(err)
+		return nil, err
+	}
+
+	if resp.StatusCode != 200 {
+		t.logger.Error(string(body))
+		return nil, fmt.Errorf("%s %s", body, t.batchId)
+	}
+	s := &stamp{}
+	err = json.Unmarshal(body, s)
+	if err != nil {
+		t.logger.Error(err)
+		return nil, err
+	}
+	return s, nil
 }

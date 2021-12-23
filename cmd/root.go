@@ -28,8 +28,9 @@ const (
 )
 
 var (
-	cfgFile   string
-	verbosity string
+	cfgFile    string
+	verbosity  string
+	accountant = "stampkeeper_accountant.json"
 
 	logger     pkg.Logger
 	keeper     *pkg.Keeper
