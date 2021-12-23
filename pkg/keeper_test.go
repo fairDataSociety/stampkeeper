@@ -114,7 +114,7 @@ func TestTaskManager(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		<-time.After(time.Second * 2)
+		<-time.After(time.Second * 8)
 		info, err := keeper.GetTaskInfo(correctBatchId)
 		if err != nil {
 			t.Fatal(err)
@@ -122,7 +122,8 @@ func TestTaskManager(t *testing.T) {
 		if info["batch"] != correctBatchId {
 			t.Fatal("batchId mismatch")
 		}
-
+		mtx.Lock()
+		defer mtx.Unlock()
 		if actions[0].Name != "topup" {
 			t.Fatal("first TopupAction should be topup")
 		}
