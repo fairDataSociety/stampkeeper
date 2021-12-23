@@ -10,7 +10,7 @@ import (
 	"fmt"
 
 	uds "github.com/asabya/go-ipc-uds"
-
+	"github.com/fairDataSociety/stampkeeper/pkg"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -87,8 +87,12 @@ based on the provided parameters`,
 				cmd.Println("Please start the keeper to run this command")
 				return
 			}
-
-			if err := keeper.Watch(name, batchId, url, minBalance, topupAmount, interval); err != nil {
+			cb := func(a *pkg.TopupAction) error {
+				// do something with action
+				logger.Infof("Got action %+v", a)
+				return nil
+			}
+			if err := keeper.Watch(name, batchId, url, minBalance, topupAmount, interval, cb); err != nil {
 				cmd.Printf("Failed to watch %s: %s\n", batchId, err.Error())
 				return
 			}

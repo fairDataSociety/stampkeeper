@@ -56,8 +56,12 @@ func TestTaskManager(t *testing.T) {
 	defer svr.Close()
 
 	t.Run("enqueue task", func(t *testing.T) {
-		keeper := New(context.Background(), svr.URL)
-		err := keeper.Watch("batch1", correctBatchId, keeper.url, "1", "2", "45s")
+		keeper := New(context.Background(), svr.URL, nil)
+		cb := func(a *TopupAction) error {
+			// do something with action
+			return nil
+		}
+		err := keeper.Watch("batch1", correctBatchId, keeper.url, "1", "2", "45s", cb)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -71,8 +75,12 @@ func TestTaskManager(t *testing.T) {
 	})
 
 	t.Run("dequeue task", func(t *testing.T) {
-		keeper := New(context.Background(), svr.URL)
-		err := keeper.Watch("batch1", correctBatchId, keeper.url, "1", "2", "2s")
+		keeper := New(context.Background(), svr.URL, nil)
+		cb := func(a *TopupAction) error {
+			// do something with action
+			return nil
+		}
+		err := keeper.Watch("batch1", correctBatchId, keeper.url, "1", "2", "2s", cb)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -91,8 +99,17 @@ func TestTaskManager(t *testing.T) {
 	})
 
 	t.Run("task actions", func(t *testing.T) {
-		keeper := New(context.Background(), svr.URL)
-		err := keeper.Watch("batch1", correctBatchId, keeper.url, "10000", "10000000", "10s")
+		keeper := New(context.Background(), svr.URL, nil)
+		actions := []*TopupAction{}
+		var mtx sync.Mutex
+		cb := func(a *TopupAction) error {
+			// do something with action
+			mtx.Lock()
+			defer mtx.Unlock()
+			actions = append(actions, a)
+			return nil
+		}
+		err := keeper.Watch("batch1", correctBatchId, keeper.url, "10000", "10000000", "10s", cb)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -105,13 +122,12 @@ func TestTaskManager(t *testing.T) {
 		if info["batch"] != correctBatchId {
 			t.Fatal("batchId mismatch")
 		}
-		actions := info["actions"].([]Action)
 
 		if actions[0].Name != "topup" {
-			t.Fatal("first Action should be topup")
+			t.Fatal("first TopupAction should be topup")
 		}
 		if actions[1].Name != "dilute" {
-			t.Fatal("second Action should be dilute")
+			t.Fatal("second TopupAction should be dilute")
 		}
 		keeper.Stop()
 	})

@@ -29,13 +29,27 @@ var (
 			if server == "" {
 				return fmt.Errorf("server endpoind is missing. please run \"--help\"")
 			}
-			keeper = pkg.New(ctx, server)
+
+			cb := func(a *pkg.TopupAction) error {
+				// do something with action
+				logger.Infof("Got action %+v", a)
+				return nil
+			}
+			keeper = pkg.New(ctx, server, logger)
 			batches := viper.Get("batches")
 			b := batches.(map[string]interface{})
 			for i, v := range b {
 				value := v.(map[string]interface{})
 				if value["active"] == "true" {
-					err := keeper.Watch(value["name"].(string), i, value["url"].(string), value["min"].(string), value["top"].(string), value["interval"].(string))
+					err := keeper.Watch(
+						value["name"].(string),
+						i,
+						value["url"].(string),
+						value["min"].(string),
+						value["top"].(string),
+						value["interval"].(string),
+						cb,
+					)
 					if err != nil {
 						cmd.Println(err)
 						return err

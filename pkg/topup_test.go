@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -64,8 +65,11 @@ func TestTopupTask(t *testing.T) {
 
 		topAmount := &big.Int{}
 		topAmount.SetString("10000000", 10)
-
-		_, err := newTopupTask(context.Background(), "batch1", wbi, svr.URL, svr.URL, minAmount, topAmount, time.Second*10)
+		cb := func(a *TopupAction) error {
+			// do something with action
+			return nil
+		}
+		_, err := newTopupTask(context.Background(), "batch1", wbi, svr.URL, svr.URL, minAmount, topAmount, time.Second*10, cb, nil)
 		if err == nil {
 			t.Fatal("wrong batch id check failed")
 		}
@@ -77,8 +81,16 @@ func TestTopupTask(t *testing.T) {
 
 		topAmount := &big.Int{}
 		topAmount.SetString("10000000", 10)
-
-		topupTask, err := newTopupTask(context.Background(), "batch1", correctBatchId, svr.URL, svr.URL, minAmount, topAmount, time.Second*2)
+		actions := []*TopupAction{}
+		var mtx sync.Mutex
+		cb := func(a *TopupAction) error {
+			// do something with action
+			mtx.Lock()
+			defer mtx.Unlock()
+			actions = append(actions, a)
+			return nil
+		}
+		topupTask, err := newTopupTask(context.Background(), "batch1", correctBatchId, svr.URL, svr.URL, minAmount, topAmount, time.Second*2, cb, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -100,12 +112,11 @@ func TestTopupTask(t *testing.T) {
 			t.Fatal("topup failed")
 		}
 
-		actions := topupTask.actions
 		if actions[0].Name != "topup" {
-			t.Fatal("first Action should be topup")
+			t.Fatal("first TopupAction should be topup")
 		}
 		if actions[1].Name != "dilute" {
-			t.Fatal("second Action should be dilute")
+			t.Fatal("second TopupAction should be dilute")
 		}
 	})
 }

@@ -15,14 +15,7 @@ import (
 	"math"
 	"math/big"
 	"net/http"
-	"sync"
 	"time"
-
-	logging "github.com/ipfs/go-log/v2"
-)
-
-var (
-	log = logging.Logger("stampkeeper/pkg")
 )
 
 type Topup struct {
@@ -37,17 +30,17 @@ type Topup struct {
 	minAmount       *big.Int
 	topupAmount     *big.Int
 	active          bool
+	logger          Logger
 
 	startedAt int64
 	stoppedAt int64
 
-	actions []Action
-
-	mtx sync.Mutex
+	callBack func(*TopupAction) error
 }
 
-type Action struct {
+type TopupAction struct {
 	Name            string
+	BatchID         string
 	PreviousBalance string
 	PreviousDepth   int
 	DoneAt          int64
@@ -69,7 +62,7 @@ type stamp struct {
 	BatchTTL      int    `json:"batchTTL"`
 }
 
-func newTopupTask(ctx context.Context, name, batchId, url, balanceEndpoint string, minAmount, topAmount *big.Int, interval time.Duration) (*Topup, error) {
+func newTopupTask(ctx context.Context, name, batchId, url, balanceEndpoint string, minAmount, topAmount *big.Int, interval time.Duration, cb func(*TopupAction) error, logger Logger) (*Topup, error) {
 	if len(batchId) != 64 {
 		return nil, fmt.Errorf("invalid batchID")
 	}
@@ -89,8 +82,9 @@ func newTopupTask(ctx context.Context, name, batchId, url, balanceEndpoint strin
 		active:          true,
 		ctx:             ctx2,
 		cancel:          cancel,
+		logger:          logger,
 
-		actions: []Action{},
+		callBack: cb,
 	}, nil
 }
 
@@ -108,27 +102,27 @@ func (t *Topup) Execute(context.Context) error {
 		// get balance
 		resp, err = http.Get(fmt.Sprintf("%s/stamps/%s", t.url, t.batchId))
 		if err != nil {
-			log.Error(err)
+			t.logger.Error(err)
 			return err
 		}
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Error(err)
+			t.logger.Error(err)
 			return err
 		}
 		err = resp.Body.Close()
 		if err != nil {
-			log.Error(err)
+			t.logger.Error(err)
 			return err
 		}
 		if resp.StatusCode != 200 {
-			log.Error(string(body))
+			t.logger.Error(string(body))
 			return fmt.Errorf("%s %s", body, t.batchId)
 		}
 		s := &stamp{}
 		err = json.Unmarshal(body, s)
 		if err != nil {
-			log.Error(err)
+			t.logger.Error(err)
 			return err
 		}
 
@@ -143,33 +137,37 @@ func (t *Topup) Execute(context.Context) error {
 			req, err := http.NewRequest(http.MethodPatch, url, nil)
 			req.Header.Set("Content-Type", "application/json")
 			if err != nil {
-				log.Error(err)
+				t.logger.Error(err)
 				return err
 			}
 
 			resp, err = client.Do(req)
 			if err != nil {
-				log.Error(err)
+				t.logger.Error(err)
 				return err
 			}
 			if resp.StatusCode != 202 {
-				log.Errorf("failed to top up %s. got code %d\n", t.batchId, resp.StatusCode)
+				t.logger.Errorf("failed to top up %s. got code %d\n", t.batchId, resp.StatusCode)
 				continue
 			}
 			err = resp.Body.Close()
 			if err != nil {
-				log.Error(err)
+				t.logger.Error(err)
 				return err
 			}
-			t.mtx.Lock()
-			t.actions = append(t.actions, Action{
+			action := &TopupAction{
+				BatchID:         t.batchId,
 				Name:            "topup",
 				PreviousBalance: s.Amount,
 				PreviousDepth:   s.Depth,
 				DoneAt:          time.Now().Unix(),
 				AmountTopped:    t.topupAmount.String(),
-			})
-			t.mtx.Unlock()
+			}
+			// callback with action
+			err = t.callBack(action)
+			if err != nil {
+				t.logger.Error("failed to run callback for batchId %s Action %+v: %s", t.batchId, action, err.Error())
+			}
 		}
 
 		// check depth
@@ -178,27 +176,27 @@ func (t *Topup) Execute(context.Context) error {
 		if used > 0.8 {
 			resp, err = http.Get(fmt.Sprintf("%s/stamps/%s", t.url, t.batchId))
 			if err != nil {
-				log.Error(err)
+				t.logger.Error(err)
 				return err
 			}
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				log.Error(err)
+				t.logger.Error(err)
 				return err
 			}
 			err = resp.Body.Close()
 			if err != nil {
-				log.Error(err)
+				t.logger.Error(err)
 				return err
 			}
 			if resp.StatusCode != 200 {
-				log.Error(string(body))
+				t.logger.Error(string(body))
 				return fmt.Errorf("%s %s", body, t.batchId)
 			}
 			s := &stamp{}
 			err = json.Unmarshal(body, s)
 			if err != nil {
-				log.Error(err)
+				t.logger.Error(err)
 				return err
 			}
 
@@ -208,33 +206,38 @@ func (t *Topup) Execute(context.Context) error {
 			req, err := http.NewRequest(http.MethodPatch, url, nil)
 			req.Header.Set("Content-Type", "application/json")
 			if err != nil {
-				log.Error(err)
+				t.logger.Error(err)
 				return err
 			}
 
 			resp, err = client.Do(req)
 			if err != nil {
-				log.Error(err)
+				t.logger.Error(err)
 				return err
 			}
 			if resp.StatusCode != 202 {
-				log.Errorf("failed to dilute %s. got code %d\n", t.batchId, resp.StatusCode)
+				t.logger.Errorf("failed to dilute %s. got code %d\n", t.batchId, resp.StatusCode)
 				continue
 			}
 			err = resp.Body.Close()
 			if err != nil {
-				log.Error(err)
+				t.logger.Error(err)
 				return err
 			}
-			t.mtx.Lock()
-			t.actions = append(t.actions, Action{
+			action := &TopupAction{
+				BatchID:         t.batchId,
 				Name:            "dilute",
 				PreviousBalance: s.Amount,
 				PreviousDepth:   s.Depth,
 				DoneAt:          time.Now().Unix(),
 				DepthAdded:      2,
-			})
-			t.mtx.Unlock()
+			}
+
+			// callback with action
+			err = t.callBack(action)
+			if err != nil {
+				t.logger.Error("failed to run callback for batchId %s Action %+v: %s", t.batchId, action, err.Error())
+			}
 		}
 		select {
 		case <-time.After(t.interval):
@@ -250,10 +253,4 @@ func (t *Topup) Name() string {
 
 func (t *Topup) Stop() {
 	t.cancel()
-}
-
-func (t *Topup) GetActions() []Action {
-	t.mtx.Lock()
-	defer t.mtx.Unlock()
-	return t.actions
 }
