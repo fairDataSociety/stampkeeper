@@ -34,7 +34,7 @@ var stopCmd = &cobra.Command{
 		}()
 		home, err := os.UserHomeDir()
 		if err != nil {
-			cmd.Println("Failed to create funding history")
+			cmd.Println("Failed to get home location")
 			return
 		}
 		filename := filepath.Join(home, fmt.Sprintf("stampkeeper_history_%d.json", time.Now().Unix()))

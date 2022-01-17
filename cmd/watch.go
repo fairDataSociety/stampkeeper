@@ -7,10 +7,13 @@ Copyright (c) 2021 Fair Data Society
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	uds "github.com/asabya/go-ipc-uds"
-
+	"github.com/fairDataSociety/stampkeeper/pkg"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -88,7 +91,7 @@ based on the provided parameters`,
 				return
 			}
 
-			if err := keeper.Watch(name, batchId, url, minBalance, topupAmount, interval); err != nil {
+			if err := keeper.Watch(name, batchId, url, minBalance, topupAmount, interval, actionCallback); err != nil {
 				cmd.Printf("Failed to watch %s: %s\n", batchId, err.Error())
 				return
 			}
@@ -107,6 +110,30 @@ based on the provided parameters`,
 			}
 			cmd.Printf("Successfully started stampkeeping on %s\n", batchId)
 		},
+	}
+
+	actionCallback = func(a *pkg.TopupAction) error {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		// do something with action
+		logger.Infof("Got action %+v", a)
+		f, err := os.OpenFile(filepath.Join(home, accountant), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		if err != nil {
+			return err
+		}
+
+		defer f.Close()
+		b, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+
+		if _, err = f.WriteString(fmt.Sprintf("%s\n", b)); err != nil {
+			return err
+		}
+		return nil
 	}
 )
 

@@ -22,23 +22,24 @@ type Keeper struct {
 	cancel      context.CancelFunc
 	taskManager *taskmanager.TaskManager
 	url         string
-
-	tasks map[string]*Topup
-	mtx   sync.Mutex
+	logger      Logger
+	tasks       map[string]*Topup
+	mtx         sync.Mutex
 }
 
-func New(ctx context.Context, url string) *Keeper {
+func New(ctx context.Context, url string, logger Logger) *Keeper {
 	ctx2, cancel := context.WithCancel(ctx)
 	return &Keeper{
 		ctx:         ctx2,
 		cancel:      cancel,
-		taskManager: taskmanager.New(1, 100, time.Second*15),
+		taskManager: taskmanager.New(1, 100, time.Second*15, logger),
 		url:         url,
+		logger:      logger,
 		tasks:       map[string]*Topup{},
 	}
 }
 
-func (k *Keeper) Watch(name, batchId, balanceEndpoint, minBalance, topupBalance, interval string) error {
+func (k *Keeper) Watch(name, batchId, balanceEndpoint, minBalance, topupBalance, interval string, cb func(action *TopupAction) error) error {
 
 	if _, err := strconv.ParseInt(minBalance, 10, 64); err != nil {
 		return err
@@ -58,7 +59,7 @@ func (k *Keeper) Watch(name, batchId, balanceEndpoint, minBalance, topupBalance,
 		return err
 	}
 
-	task, err := newTopupTask(k.ctx, name, batchId, k.url, balanceEndpoint, minAmount, topAmount, intervalDuration)
+	task, err := newTopupTask(k.ctx, name, batchId, k.url, balanceEndpoint, minAmount, topAmount, intervalDuration, cb, k.logger)
 	if err != nil {
 		return err
 	}
@@ -93,7 +94,6 @@ func (k *Keeper) List() []interface{} {
 		info := map[string]interface{}{}
 		info["batch"] = i
 		info["active"] = v.active
-		info["actions"] = v.GetActions()
 		tasks = append(tasks, info)
 	}
 	return tasks
@@ -105,7 +105,6 @@ func (k *Keeper) GetTaskInfo(batchId string) (map[string]interface{}, error) {
 	info := map[string]interface{}{}
 	if k.tasks[batchId] != nil {
 		info["batch"] = batchId
-		info["actions"] = k.tasks[batchId].GetActions()
 		return info, nil
 	}
 	return nil, fmt.Errorf("stampkeeper not running for this batch id")

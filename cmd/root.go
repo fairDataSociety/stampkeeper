@@ -10,13 +10,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
 	uds "github.com/asabya/go-ipc-uds"
 	"github.com/fairDataSociety/stampkeeper/pkg"
-	logging "github.com/ipfs/go-log/v2"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -28,7 +29,10 @@ const (
 
 var (
 	cfgFile    string
-	log        = logging.Logger("cmd")
+	verbosity  string
+	accountant = "stampkeeper_accountant.json"
+
+	logger     pkg.Logger
 	keeper     *pkg.Keeper
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -46,11 +50,28 @@ It will top them up and dilute stamps as required.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	switch v := strings.ToLower(verbosity); v {
+	case "0", "silent":
+		logger = pkg.NewLogger(ioutil.Discard, 0)
+	case "1", "error":
+		logger = pkg.NewLogger(rootCmd.OutOrStdout(), logrus.ErrorLevel)
+	case "2", "warn":
+		logger = pkg.NewLogger(rootCmd.OutOrStdout(), logrus.WarnLevel)
+	case "3", "info":
+		logger = pkg.NewLogger(rootCmd.OutOrStdout(), logrus.InfoLevel)
+	case "4", "debug":
+		logger = pkg.NewLogger(rootCmd.OutOrStdout(), logrus.DebugLevel)
+	case "5", "trace":
+		logger = pkg.NewLogger(rootCmd.OutOrStdout(), logrus.TraceLevel)
+	default:
+		fmt.Println("unknown verbosity level ", v)
+		os.Exit(1)
+	}
 	tmp := os.TempDir()
 	socketPath = filepath.Join(tmp, sockPath)
 	ctx, cancel = context.WithCancel(context.Background())
 	if !uds.IsIPCListening(socketPath) {
-		keeper = pkg.New(ctx, server)
+		keeper = pkg.New(ctx, server, logger)
 	}
 
 	if len(os.Args) > 1 {
@@ -60,24 +81,24 @@ func Execute() {
 			}
 			r, w, c, err := uds.Dialer(opts)
 			if err != nil {
-				log.Error(err)
+				logger.Error(err)
 				goto Execute
 			}
 			defer func() {
 				err := c()
 				if err != nil {
-					log.Error(err)
+					logger.Error(err)
 				}
 			}()
 
 			err = w(strings.Join(os.Args[1:], argSeparator))
 			if err != nil {
-				log.Error(err)
+				logger.Error(err)
 				os.Exit(1)
 			}
 			v, err := r()
 			if err != nil {
-				log.Error(err)
+				logger.Error(err)
 				os.Exit(1)
 
 			}
@@ -93,7 +114,7 @@ func Execute() {
 			if !os.IsNotExist(err) {
 				err := os.Remove(filepath.Join(tmp, sockPath))
 				if err != nil {
-					log.Error(err)
+					logger.Error(err)
 					os.Exit(1)
 				}
 			}
@@ -102,7 +123,7 @@ func Execute() {
 			}
 			in, err := uds.Listener(context.Background(), opts)
 			if err != nil {
-				log.Error(err)
+				logger.Error(err)
 				os.Exit(1)
 			}
 			go func() {
@@ -133,7 +154,7 @@ func Execute() {
 							if err != nil {
 								err = client.Write([]byte(err.Error()))
 								if err != nil {
-									log.Error("Write error", err)
+									logger.Error("Write error", err)
 									client.Close()
 								}
 								break
@@ -141,14 +162,14 @@ func Execute() {
 							childCmd.Flags().VisitAll(func(f *pflag.Flag) {
 								err := f.Value.Set(f.DefValue)
 								if err != nil {
-									log.Error("Unable to set flags ", childCmd.Name(), f.Name, err.Error())
+									logger.Error("Unable to set flags ", childCmd.Name(), f.Name, err.Error())
 								}
 							})
 							if err := childCmd.Flags().Parse(flags); err != nil {
-								log.Error("Unable to parse flags ", err.Error())
+								logger.Error("Unable to parse flags ", err.Error())
 								err = client.Write([]byte(err.Error()))
 								if err != nil {
-									log.Error("Write error", err)
+									logger.Error("Write error", err)
 									client.Close()
 								}
 								break
@@ -159,7 +180,7 @@ func Execute() {
 								if err := childCmd.Args(childCmd, flags); err != nil {
 									err = client.Write([]byte(err.Error()))
 									if err != nil {
-										log.Error("Write error", err)
+										logger.Error("Write error", err)
 										client.Close()
 									}
 									break
@@ -169,7 +190,7 @@ func Execute() {
 								if err := childCmd.PreRunE(childCmd, flags); err != nil {
 									err = client.Write([]byte(err.Error()))
 									if err != nil {
-										log.Error("Write error", err)
+										logger.Error("Write error", err)
 										client.Close()
 									}
 									break
@@ -182,7 +203,7 @@ func Execute() {
 								if err := childCmd.RunE(childCmd, flags); err != nil {
 									err = client.Write([]byte(err.Error()))
 									if err != nil {
-										log.Error("Write error", err)
+										logger.Error("Write error", err)
 										client.Close()
 									}
 									break
@@ -195,7 +216,7 @@ func Execute() {
 							outBuf.Reset()
 							err = client.Write(out)
 							if err != nil {
-								log.Error("Write error", err)
+								logger.Error("Write error", err)
 								client.Close()
 								break
 							}
@@ -217,6 +238,7 @@ func init() {
 
 	// Flag definitions
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.stampkeeper.yaml)")
+	rootCmd.PersistentFlags().StringVar(&verbosity, "verbosity", "5", "verbosity level")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -239,11 +261,11 @@ func initConfig() {
 
 	// If config file is not present, write it
 	if err := viper.SafeWriteConfig(); err == nil {
-		log.Info(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		logger.Info("Using config file:", viper.ConfigFileUsed())
 	}
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		log.Info(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		logger.Info("Using config file:", viper.ConfigFileUsed())
 	}
 }
