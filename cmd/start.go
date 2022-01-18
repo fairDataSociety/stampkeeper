@@ -12,9 +12,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/fairDataSociety/stampkeeper/pkg"
+	"github.com/fairDataSociety/stampkeeper/pkg/bot/telegram"
+
+	uds "github.com/asabya/go-ipc-uds"
+	"github.com/fairDataSociety/stampkeeper/pkg/api"
+
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -29,28 +32,17 @@ var (
 			if server == "" {
 				return fmt.Errorf("server endpoind is missing. please run \"--help\"")
 			}
-
-			keeper = pkg.New(ctx, server, logger)
-			batches := viper.Get("batches")
-			b := batches.(map[string]interface{})
-			for i, v := range b {
-				value := v.(map[string]interface{})
-				if value["active"] == "true" {
-					err := keeper.Watch(
-						value["name"].(string),
-						i,
-						value["url"].(string),
-						value["min"].(string),
-						value["top"].(string),
-						value["interval"].(string),
-						actionCallback,
-					)
-					if err != nil {
-						cmd.Println(err)
-						return err
-					}
-				}
+			if uds.IsIPCListening(socketPath) {
+				return fmt.Errorf("server already running")
 			}
+			handler = api.NewHandler(ctx, server, logger)
+			botHandler, err := telegram.NewBot(handler)
+			if err != nil {
+				logger.Errorf("failed to create bot instance")
+				return err
+			}
+			handler.SetBot(botHandler)
+
 			c := make(chan os.Signal, 1)
 			signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 

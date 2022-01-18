@@ -7,12 +7,9 @@ Copyright (c) 2021 Fair Data Society
 package cmd
 
 import (
-	"fmt"
-
 	uds "github.com/asabya/go-ipc-uds"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // unwatchCmd represents the unwatch command
@@ -25,8 +22,8 @@ var unwatchCmd = &cobra.Command{
 			cmd.Println("Please start the keeper to run this command")
 			return
 		}
-		if keeper == nil {
-			cmd.Println("Please start the keeper to run this command")
+		if handler == nil {
+			cmd.Println("Please run start command before unwatch")
 			return
 		}
 		batchId, err := cmd.Flags().GetString("batch")
@@ -38,19 +35,11 @@ var unwatchCmd = &cobra.Command{
 			cmd.Println("Please provide a valid batch id")
 			return
 		}
-		if err := keeper.Unwatch(batchId); err != nil {
+		if err := handler.Unwatch(batchId); err != nil {
 			cmd.Printf("Failed to watch %s: %s\n", batchId, err.Error())
 			return
 		}
 		cmd.Printf("Successfully stopped stampkeeping on %s\n", batchId)
-		b := viper.Get(fmt.Sprintf("batches.%s", batchId))
-		a := b.(map[string]interface{})
-		a["active"] = "false"
-		viper.Set(fmt.Sprintf("batches.%s", batchId), a)
-		if err := viper.WriteConfig(); err != nil {
-			cmd.Printf("Failed to write config with batchId info %s: %s\n", batchId, err.Error())
-			return
-		}
 	},
 }
 

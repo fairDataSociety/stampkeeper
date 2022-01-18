@@ -4,7 +4,7 @@ MIT License
 Copyright (c) 2021 Fair Data Society
 
 */
-package pkg
+package topup
 
 import (
 	"context"
@@ -16,6 +16,8 @@ import (
 	"math/big"
 	"net/http"
 	"time"
+
+	"github.com/fairDataSociety/stampkeeper/pkg/logging"
 )
 
 type Topup struct {
@@ -30,7 +32,7 @@ type Topup struct {
 	minAmount       *big.Int
 	topupAmount     *big.Int
 	active          bool
-	logger          Logger
+	logger          logging.Logger
 
 	startedAt int64
 	stoppedAt int64
@@ -39,7 +41,7 @@ type Topup struct {
 }
 
 type TopupAction struct {
-	Name            string
+	Action          string
 	BatchID         string
 	PreviousBalance string
 	CurrentBalance  string
@@ -50,7 +52,7 @@ type TopupAction struct {
 	AmountTopped    string
 }
 
-type stamp struct {
+type Stamp struct {
 	BatchID       string `json:"batchID"`
 	Utilization   int    `json:"utilization"`
 	Usable        bool   `json:"usable"`
@@ -64,7 +66,7 @@ type stamp struct {
 	BatchTTL      int    `json:"batchTTL"`
 }
 
-func newTopupTask(ctx context.Context, name, batchId, url, balanceEndpoint string, minAmount, topAmount *big.Int, interval time.Duration, cb func(*TopupAction) error, logger Logger) (*Topup, error) {
+func NewTopupTask(ctx context.Context, name, batchId, url, balanceEndpoint string, minAmount, topAmount *big.Int, interval time.Duration, cb func(*TopupAction) error, logger logging.Logger) (*Topup, error) {
 	if len(batchId) != 64 {
 		return nil, fmt.Errorf("invalid batchID")
 	}
@@ -144,7 +146,7 @@ func (t *Topup) Execute(context.Context) error {
 			}
 			action := &TopupAction{
 				BatchID:         t.batchId,
-				Name:            "topup",
+				Action:          "topup",
 				PreviousBalance: s.Amount,
 				PreviousDepth:   s.Depth,
 				CurrentBalance:  sNew.Amount,
@@ -200,7 +202,7 @@ func (t *Topup) Execute(context.Context) error {
 			}
 			action := &TopupAction{
 				BatchID:         t.batchId,
-				Name:            "dilute",
+				Action:          "dilute",
 				PreviousBalance: s.Amount,
 				PreviousDepth:   s.Depth,
 				CurrentBalance:  sNew.Amount,
@@ -231,7 +233,19 @@ func (t *Topup) Stop() {
 	t.cancel()
 }
 
-func (t *Topup) getStamp() (*stamp, error) {
+func (t *Topup) State() bool {
+	return t.active
+}
+
+func (t *Topup) Activate() {
+	t.active = true
+}
+
+func (t *Topup) Deactivate() {
+	t.active = false
+}
+
+func (t *Topup) getStamp() (*Stamp, error) {
 	resp, err := http.Get(fmt.Sprintf("%s/stamps/%s", t.url, t.batchId))
 	if err != nil {
 		t.logger.Error(err)
@@ -252,7 +266,7 @@ func (t *Topup) getStamp() (*stamp, error) {
 		t.logger.Error(string(body))
 		return nil, fmt.Errorf("%s %s", body, t.batchId)
 	}
-	s := &stamp{}
+	s := &Stamp{}
 	err = json.Unmarshal(body, s)
 	if err != nil {
 		t.logger.Error(err)

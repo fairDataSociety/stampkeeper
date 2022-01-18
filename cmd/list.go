@@ -24,11 +24,11 @@ along will some stats`,
 			cmd.Println("Please start the keeper to run this command")
 			return
 		}
-		if keeper == nil {
-			cmd.Println("Please start the keeper to run this command")
+		if handler == nil {
+			cmd.Println("Please run start command before list")
 			return
 		}
-		list := keeper.List()
+		list := handler.List()
 		b, err := json.MarshalIndent(list, "", "\t")
 		if err != nil {
 			cmd.Println("Failed to read batch list")

@@ -16,7 +16,8 @@ import (
 	"strings"
 
 	uds "github.com/asabya/go-ipc-uds"
-	"github.com/fairDataSociety/stampkeeper/pkg"
+	"github.com/fairDataSociety/stampkeeper/pkg/api"
+	"github.com/fairDataSociety/stampkeeper/pkg/logging"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -28,12 +29,11 @@ const (
 )
 
 var (
-	cfgFile    string
-	verbosity  string
-	accountant = "stampkeeper_accountant.json"
+	cfgFile   string
+	verbosity string
 
-	logger     pkg.Logger
-	keeper     *pkg.Keeper
+	logger     logging.Logger
+	handler    *api.Handler
 	ctx        context.Context
 	cancel     context.CancelFunc
 	sockPath   = "stampkeeper.sock"
@@ -52,17 +52,17 @@ It will top them up and dilute stamps as required.`,
 func Execute() {
 	switch v := strings.ToLower(verbosity); v {
 	case "0", "silent":
-		logger = pkg.NewLogger(ioutil.Discard, 0)
+		logger = logging.NewLogger(ioutil.Discard, 0)
 	case "1", "error":
-		logger = pkg.NewLogger(rootCmd.OutOrStdout(), logrus.ErrorLevel)
+		logger = logging.NewLogger(rootCmd.OutOrStdout(), logrus.ErrorLevel)
 	case "2", "warn":
-		logger = pkg.NewLogger(rootCmd.OutOrStdout(), logrus.WarnLevel)
+		logger = logging.NewLogger(rootCmd.OutOrStdout(), logrus.WarnLevel)
 	case "3", "info":
-		logger = pkg.NewLogger(rootCmd.OutOrStdout(), logrus.InfoLevel)
+		logger = logging.NewLogger(rootCmd.OutOrStdout(), logrus.InfoLevel)
 	case "4", "debug":
-		logger = pkg.NewLogger(rootCmd.OutOrStdout(), logrus.DebugLevel)
+		logger = logging.NewLogger(rootCmd.OutOrStdout(), logrus.DebugLevel)
 	case "5", "trace":
-		logger = pkg.NewLogger(rootCmd.OutOrStdout(), logrus.TraceLevel)
+		logger = logging.NewLogger(rootCmd.OutOrStdout(), logrus.TraceLevel)
 	default:
 		fmt.Println("unknown verbosity level ", v)
 		os.Exit(1)
@@ -70,9 +70,6 @@ func Execute() {
 	tmp := os.TempDir()
 	socketPath = filepath.Join(tmp, sockPath)
 	ctx, cancel = context.WithCancel(context.Background())
-	if !uds.IsIPCListening(socketPath) {
-		keeper = pkg.New(ctx, server, logger)
-	}
 
 	if len(os.Args) > 1 {
 		if os.Args[1] != "start" && uds.IsIPCListening(socketPath) {

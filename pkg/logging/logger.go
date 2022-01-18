@@ -1,4 +1,4 @@
-package pkg
+package logging
 
 import (
 	"io"
