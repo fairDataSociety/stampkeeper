@@ -96,6 +96,7 @@ func (k *Keeper) List() []interface{} {
 		info := map[string]interface{}{}
 		info["batch"] = i
 		info["active"] = v.State()
+		info["name"] = v.Name()
 		tasks = append(tasks, info)
 	}
 	return tasks
