@@ -22,13 +22,7 @@ type Bot struct {
 }
 
 func (b *Bot) Notify(message string) error {
-	msg := tgbotapi.NewMessage(chatId, message)
-	_, err := b.bot.Send(msg)
-	if err != nil {
-		b.logger.Errorf("failed to send message %s", err.Error())
-		return err
-	}
-	return nil
+	return b.send(message)
 }
 
 func (b *Bot) List() error {
@@ -42,39 +36,21 @@ func (b *Bot) List() error {
 		}
 		listText += fmt.Sprintf("\"%s\" (%s) is %v\n", item["name"], item["batch"], status)
 	}
-	msg := tgbotapi.NewMessage(chatId, listText)
-	_, err := b.bot.Send(msg)
-	if err != nil {
-		b.logger.Errorf("failed to send message %s", err.Error())
-		return err
-	}
-	return nil
+	return b.send(listText)
 }
 
 func (b *Bot) Watch(name, batchId, balanceEndpoint, minBalance, topupBalance, interval string) error {
 	if err := b.api.Watch(name, batchId, balanceEndpoint, minBalance, topupBalance, interval); err != nil {
 		return err
 	}
-	msg := tgbotapi.NewMessage(chatId, "started watching batch")
-	_, err := b.bot.Send(msg)
-	if err != nil {
-		b.logger.Errorf("failed to send message %s", err.Error())
-		return err
-	}
-	return nil
+	return b.send("started watching batch")
 }
 
 func (b *Bot) Unwatch(batchId string) error {
 	if err := b.api.Unwatch(batchId); err != nil {
 		return err
 	}
-	msg := tgbotapi.NewMessage(chatId, "stopped watching batch")
-	_, err := b.bot.Send(msg)
-	if err != nil {
-		b.logger.Errorf("failed to send message %s", err.Error())
-		return err
-	}
-	return nil
+	return b.send("stopped watching batch")
 }
 
 func (b *Bot) send(message string) error {
