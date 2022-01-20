@@ -38,7 +38,7 @@ var (
 
 			token := viper.Get("telegram_bot_token")
 			if token == nil {
-				return fmt.Errorf("bot token not available")
+				return fmt.Errorf("bot token not available, add \"telegram_bot_token\" in your config file")
 			}
 			botHandler, err := telegram.NewBot(ctx, fmt.Sprintf("%v", token), handler, logger)
 			if err != nil {

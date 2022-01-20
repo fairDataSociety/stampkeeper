@@ -131,16 +131,21 @@ func NewBot(ctx context.Context, token string, api *api.Handler, logger logging.
 	Please choose a name without spaces
 
 /unwatch - Stop watching a batch
+	
+	/unwatch batchId
+
 /help - General usage instruction`
 					if err := bot.send(helpMessage); err != nil {
 						bot.logger.Errorf("failed to send message %s", err.Error())
 						continue
 					}
+
 				case "list":
 					if err := bot.List(); err != nil {
 						bot.logger.Errorf("failed to send message %s", err.Error())
 						continue
 					}
+
 				case "watch":
 					args := strings.Split(update.Message.Text, " ")
 					if len(args) != 7 {
@@ -160,15 +165,28 @@ func NewBot(ctx context.Context, token string, api *api.Handler, logger logging.
 					}
 
 				case "unwatch":
-					if err := bot.Unwatch("asd"); err != nil {
-						bot.logger.Errorf("failed to send message %s", err.Error())
+					args := strings.Split(update.Message.Text, " ")
+					if len(args) != 2 {
+						if err := bot.send("invalid arguments. aborting"); err != nil {
+							bot.logger.Errorf("failed to send message %s", err.Error())
+							continue
+						}
 						continue
 					}
+					if err := bot.Unwatch(args[1]); err != nil {
+						bot.logger.Errorf("failed to unwatch %s", err.Error())
+						if err := bot.send("invalid arguments. aborting"); err != nil {
+							bot.logger.Errorf("failed to send message %s", err.Error())
+							continue
+						}
+					}
+
 				case "version":
 					if err := bot.send("v0.0.1"); err != nil {
 						bot.logger.Errorf("failed to send message %s", err.Error())
 						continue
 					}
+
 				default:
 					if err := bot.send("I don't know that command"); err != nil {
 						bot.logger.Errorf("failed to send message %s", err.Error())
