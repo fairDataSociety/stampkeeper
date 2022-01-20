@@ -14,6 +14,7 @@ import (
 
 	uds "github.com/asabya/go-ipc-uds"
 	"github.com/fairDataSociety/stampkeeper/pkg/api"
+	"github.com/fairDataSociety/stampkeeper/pkg/bot/mock"
 	"github.com/fairDataSociety/stampkeeper/pkg/bot/telegram"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -37,16 +38,21 @@ var (
 			handler = api.NewHandler(ctx, server, logger)
 
 			token := viper.Get("telegram_bot_token")
-			if token == nil {
-				return fmt.Errorf("bot token not available, add \"telegram_bot_token\" in your config file")
+			if token != nil {
+				botHandler, err := telegram.NewBot(ctx, fmt.Sprintf("%v", token), handler, logger)
+				if err != nil {
+					logger.Errorf("failed to create bot instance")
+					return err
+				}
+				handler.SetBot(botHandler)
+			} else {
+				logger.Warningf("bot token not available, add \"telegram_bot_token\" in your config file")
+
+				mockBot := &mock.Bot{}
+				handler.SetBot(mockBot)
 			}
-			botHandler, err := telegram.NewBot(ctx, fmt.Sprintf("%v", token), handler, logger)
-			if err != nil {
-				logger.Errorf("failed to create bot instance")
-				return err
-			}
-			handler.SetBot(botHandler)
-			err = handler.StartWatchingAll()
+
+			err := handler.StartWatchingAll()
 			if err != nil {
 				logger.Errorf("failed to start watching all batches")
 				return err
