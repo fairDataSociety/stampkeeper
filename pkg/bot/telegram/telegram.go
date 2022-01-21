@@ -10,13 +10,10 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-const (
-	chatId = -645549805
-)
-
 type Bot struct {
-	bot *tgbotapi.BotAPI
-	api *api.Handler
+	bot    *tgbotapi.BotAPI
+	chatId int64
+	api    *api.Handler
 
 	logger logging.Logger
 }
@@ -54,7 +51,7 @@ func (b *Bot) Unwatch(batchId string) error {
 }
 
 func (b *Bot) send(message string) error {
-	msg := tgbotapi.NewMessage(chatId, message)
+	msg := tgbotapi.NewMessage(b.chatId, message)
 	_, err := b.bot.Send(msg)
 	if err != nil {
 		b.logger.Errorf("failed to send message %s", err.Error())
@@ -63,7 +60,7 @@ func (b *Bot) send(message string) error {
 	return nil
 }
 
-func NewBot(ctx context.Context, token string, api *api.Handler, logger logging.Logger) (*Bot, error) {
+func NewBot(ctx context.Context, token string, chatId int64, api *api.Handler, logger logging.Logger) (*Bot, error) {
 	telegramBot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, err
@@ -73,6 +70,7 @@ func NewBot(ctx context.Context, token string, api *api.Handler, logger logging.
 	bot := &Bot{
 		bot:    telegramBot,
 		api:    api,
+		chatId: chatId,
 		logger: logger,
 	}
 	updates := telegramBot.GetUpdatesChan(u)
@@ -89,7 +87,7 @@ func NewBot(ctx context.Context, token string, api *api.Handler, logger logging.
 					bot.logger.Debug(update.Message.Text, " is not a command")
 					continue
 				}
-				if update.Message.Chat.ID != chatId {
+				if update.Message.Chat.ID != bot.chatId {
 					bot.logger.Debug("unknown chat")
 					continue
 				}

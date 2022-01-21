@@ -37,9 +37,14 @@ var (
 			}
 			handler = api.NewHandler(ctx, server, logger)
 
-			token := viper.Get("telegram_bot_token")
-			if token != nil {
-				botHandler, err := telegram.NewBot(ctx, fmt.Sprintf("%v", token), handler, logger)
+			token := viper.GetString("telegram_bot_token")
+			if token != "" {
+				chatId := viper.GetInt64("chat_id")
+				if chatId == 0 {
+					return fmt.Errorf("chatId not available, add \"chat_id\" in your config file")
+				}
+
+				botHandler, err := telegram.NewBot(ctx, token, chatId, handler, logger)
 				if err != nil {
 					logger.Errorf("failed to create bot instance")
 					return err
