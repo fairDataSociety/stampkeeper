@@ -106,3 +106,6 @@ It has the following commands
 
 /help - General usage instruction
 ```
+
+## Activity Log
+Stampkeeper append all transactions in .stampkeepr.yml and accounts in stampkeeper.accountant.json
