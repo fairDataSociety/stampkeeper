@@ -108,4 +108,4 @@ It has the following commands
 ```
 
 ## Activity Log
-Stampkeeper append all transactions in .stampkeepr.yml and accounts in stampkeeper.accountant.json
+Stampkeeper appends all batches in .stampkeeper.yaml and transactions in stampkeeper_accountant.json
