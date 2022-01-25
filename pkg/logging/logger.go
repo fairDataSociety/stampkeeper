@@ -1,4 +1,4 @@
-package pkg
+package logging
 
 import (
 	"io"
@@ -7,8 +7,6 @@ import (
 )
 
 type Logger interface {
-	Tracef(format string, args ...interface{})
-	Trace(args ...interface{})
 	Debugf(format string, args ...interface{})
 	Debug(args ...interface{})
 	Infof(format string, args ...interface{})
@@ -17,10 +15,6 @@ type Logger interface {
 	Warning(args ...interface{})
 	Errorf(format string, args ...interface{})
 	Error(args ...interface{})
-	WithField(key string, value interface{}) *logrus.Entry
-	WithFields(fields logrus.Fields) *logrus.Entry
-	WriterLevel(logrus.Level) *io.PipeWriter
-	NewEntry() *logrus.Entry
 }
 
 type logger struct {

@@ -4,7 +4,7 @@ MIT License
 Copyright (c) 2021 Fair Data Society
 
 */
-package pkg
+package keeper
 
 import (
 	"context"
@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fairDataSociety/stampkeeper/pkg/logging"
+	"github.com/fairDataSociety/stampkeeper/pkg/topup"
 	"github.com/plexsysio/taskmanager"
 )
 
@@ -22,12 +24,12 @@ type Keeper struct {
 	cancel      context.CancelFunc
 	taskManager *taskmanager.TaskManager
 	url         string
-	logger      Logger
-	tasks       map[string]*Topup
+	logger      logging.Logger
+	tasks       map[string]*topup.Topup
 	mtx         sync.Mutex
 }
 
-func New(ctx context.Context, url string, logger Logger) *Keeper {
+func New(ctx context.Context, url string, logger logging.Logger) *Keeper {
 	ctx2, cancel := context.WithCancel(ctx)
 	return &Keeper{
 		ctx:         ctx2,
@@ -35,11 +37,11 @@ func New(ctx context.Context, url string, logger Logger) *Keeper {
 		taskManager: taskmanager.New(1, 100, time.Second*15, logger),
 		url:         url,
 		logger:      logger,
-		tasks:       map[string]*Topup{},
+		tasks:       map[string]*topup.Topup{},
 	}
 }
 
-func (k *Keeper) Watch(name, batchId, balanceEndpoint, minBalance, topupBalance, interval string, cb func(action *TopupAction) error) error {
+func (k *Keeper) Watch(name, batchId, balanceEndpoint, minBalance, topupBalance, interval string, cb func(action *topup.TopupAction) error) error {
 
 	if _, err := strconv.ParseInt(minBalance, 10, 64); err != nil {
 		return err
@@ -59,7 +61,7 @@ func (k *Keeper) Watch(name, batchId, balanceEndpoint, minBalance, topupBalance,
 		return err
 	}
 
-	task, err := newTopupTask(k.ctx, name, batchId, k.url, balanceEndpoint, minAmount, topAmount, intervalDuration, cb, k.logger)
+	task, err := topup.NewTopupTask(k.ctx, name, batchId, k.url, balanceEndpoint, minAmount, topAmount, intervalDuration, cb, k.logger)
 	if err != nil {
 		return err
 	}
@@ -79,7 +81,7 @@ func (k *Keeper) Unwatch(batchId string) error {
 	defer k.mtx.Unlock()
 	if k.tasks[batchId] != nil {
 		task := k.tasks[batchId]
-		task.active = false
+		task.Deactivate()
 		task.Stop()
 		return nil
 	}
@@ -93,7 +95,8 @@ func (k *Keeper) List() []interface{} {
 	for i, v := range k.tasks {
 		info := map[string]interface{}{}
 		info["batch"] = i
-		info["active"] = v.active
+		info["active"] = v.State()
+		info["name"] = v.Name()
 		tasks = append(tasks, info)
 	}
 	return tasks

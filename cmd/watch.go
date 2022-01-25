@@ -7,15 +7,8 @@ Copyright (c) 2021 Fair Data Society
 package cmd
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
-
 	uds "github.com/asabya/go-ipc-uds"
-	"github.com/fairDataSociety/stampkeeper/pkg"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -86,54 +79,18 @@ based on the provided parameters`,
 				cmd.Println("Please provide the amount to be topped up")
 				return
 			}
-			if keeper == nil {
-				cmd.Println("Please start the keeper to run this command")
+			if handler == nil {
+				cmd.Println("Please run start command before watch")
 				return
 			}
 
-			if err := keeper.Watch(name, batchId, url, minBalance, topupAmount, interval, actionCallback); err != nil {
+			if err := handler.Watch(name, batchId, url, minBalance, topupAmount, interval); err != nil {
 				cmd.Printf("Failed to watch %s: %s\n", batchId, err.Error())
 				return
 			}
-			conf := map[string]string{}
-			conf["name"] = name
-			conf["interval"] = interval
-			conf["url"] = url
-			conf["min"] = minBalance
-			conf["top"] = topupAmount
-			conf["active"] = "true"
 
-			viper.Set(fmt.Sprintf("batches.%s", batchId), conf)
-			if err := viper.WriteConfig(); err != nil {
-				cmd.Printf("Failed to write config with batchId info %s: %s\n", batchId, err.Error())
-				return
-			}
 			cmd.Printf("Successfully started stampkeeping on %s\n", batchId)
 		},
-	}
-
-	actionCallback = func(a *pkg.TopupAction) error {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		// do something with action
-		logger.Infof("Got action %+v", a)
-		f, err := os.OpenFile(filepath.Join(home, accountant), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-		if err != nil {
-			return err
-		}
-
-		defer f.Close()
-		b, err := json.Marshal(a)
-		if err != nil {
-			return err
-		}
-
-		if _, err = f.WriteString(fmt.Sprintf("%s\n", b)); err != nil {
-			return err
-		}
-		return nil
 	}
 )
 

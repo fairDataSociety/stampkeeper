@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/asabya/go-ipc-uds v0.1.2
+	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/plexsysio/taskmanager v0.0.0-20211220123746-de5ebdd49ae2
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v1.3.0
