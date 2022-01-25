@@ -30,12 +30,13 @@ func (h *Handler) actionCallback(a *topup.TopupAction) error {
 	if err != nil {
 		return err
 	}
-
-	if _, err = f.WriteString(fmt.Sprintf("%s\n", b)); err != nil {
+	actionString := fmt.Sprintf("%s\n", b)
+	if _, err = f.WriteString(actionString); err != nil {
 		return err
 	}
 
-	if err := h.bot.Notify(fmt.Sprintf("%s\n", b)); err != nil {
+	message := fmt.Sprintf("Action: %s | BatchID : %s | AmountTopped: %s | DepthAdded : %d \n\n %s", a.Action, a.BatchID, a.AmountTopped, a.DepthAdded, actionString)
+	if err := h.bot.Notify(message); err != nil {
 		return err
 	}
 	return nil
