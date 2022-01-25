@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/fairDataSociety/stampkeeper/pkg/logging/mock"
 )
 
 var (
@@ -69,7 +71,7 @@ func TestTopupTask(t *testing.T) {
 			// do something with action
 			return nil
 		}
-		_, err := NewTopupTask(context.Background(), "batch1", wbi, svr.URL, svr.URL, minAmount, topAmount, time.Second*10, cb, nil)
+		_, err := NewTopupTask(context.Background(), "batch1", wbi, svr.URL, svr.URL, minAmount, topAmount, time.Second*10, cb, mock.Logging{})
 		if err == nil {
 			t.Fatal("wrong batch id check failed")
 		}
@@ -90,7 +92,7 @@ func TestTopupTask(t *testing.T) {
 			actions = append(actions, a)
 			return nil
 		}
-		topupTask, err := NewTopupTask(context.Background(), "batch1", correctBatchId, svr.URL, svr.URL, minAmount, topAmount, time.Second*2, cb, nil)
+		topupTask, err := NewTopupTask(context.Background(), "batch1", correctBatchId, svr.URL, svr.URL, minAmount, topAmount, time.Second*2, cb, mock.Logging{})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fairDataSociety/stampkeeper/pkg/logging/mock"
 	"github.com/fairDataSociety/stampkeeper/pkg/topup"
 )
 
@@ -25,49 +26,49 @@ type mockResponse struct {
 }
 
 func TestTaskManager(t *testing.T) {
-	var mtx sync.Mutex
-	stampInfo := &topup.Stamp{
-		BatchID:     correctBatchId,
-		Amount:      initialAmount,
-		Utilization: 16,
-		Depth:       20,
-		BucketDepth: 16,
-	}
-	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.String(), "/stamps/topup/") {
-			mtx.Lock()
-			amount := &big.Int{}
-			amount.SetString(stampInfo.Amount, 10)
-			amount = amount.Add(amount, big.NewInt(10000000))
-			stampInfo.Amount = amount.String()
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(202)
-			_ = json.NewEncoder(w).Encode(&mockResponse{BatchID: stampInfo.BatchID})
-			mtx.Unlock()
-		} else if strings.HasPrefix(r.URL.String(), "/stamps/dilute/") {
-			mtx.Lock()
-			amount := &big.Int{}
-			amount.SetString(stampInfo.Amount, 10)
-			amount = amount.Sub(amount, big.NewInt(5000000))
-			stampInfo.Amount = amount.String()
-			stampInfo.Depth = stampInfo.Depth + 2
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(202)
-			_ = json.NewEncoder(w).Encode(&mockResponse{BatchID: stampInfo.BatchID})
-			mtx.Unlock()
-		} else if strings.HasPrefix(r.URL.String(), "/stamps/") {
-			mtx.Lock()
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(stampInfo)
-			mtx.Unlock()
-		} else {
-			fmt.Println()
-		}
-	}))
-	defer svr.Close()
 
 	t.Run("enqueue task", func(t *testing.T) {
-		keeper := New(context.Background(), svr.URL, nil)
+		var mtx sync.Mutex
+		stampInfo := &topup.Stamp{
+			BatchID:     correctBatchId,
+			Amount:      initialAmount,
+			Utilization: 16,
+			Depth:       20,
+			BucketDepth: 16,
+		}
+		svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.String(), "/stamps/topup/") {
+				mtx.Lock()
+				amount := &big.Int{}
+				amount.SetString(stampInfo.Amount, 10)
+				amount = amount.Add(amount, big.NewInt(10000000))
+				stampInfo.Amount = amount.String()
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(202)
+				_ = json.NewEncoder(w).Encode(&mockResponse{BatchID: stampInfo.BatchID})
+				mtx.Unlock()
+			} else if strings.HasPrefix(r.URL.String(), "/stamps/dilute/") {
+				mtx.Lock()
+				amount := &big.Int{}
+				amount.SetString(stampInfo.Amount, 10)
+				amount = amount.Sub(amount, big.NewInt(5000000))
+				stampInfo.Amount = amount.String()
+				stampInfo.Depth = stampInfo.Depth + 2
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(202)
+				_ = json.NewEncoder(w).Encode(&mockResponse{BatchID: stampInfo.BatchID})
+				mtx.Unlock()
+			} else if strings.HasPrefix(r.URL.String(), "/stamps/") {
+				mtx.Lock()
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(stampInfo)
+				mtx.Unlock()
+			} else {
+				fmt.Println()
+			}
+		}))
+		defer svr.Close()
+		keeper := New(context.Background(), svr.URL, mock.Logging{})
 		cb := func(a *topup.TopupAction) error {
 			// do something with action
 			return nil
@@ -86,7 +87,47 @@ func TestTaskManager(t *testing.T) {
 	})
 
 	t.Run("dequeue task", func(t *testing.T) {
-		keeper := New(context.Background(), svr.URL, nil)
+		var mtx sync.Mutex
+		stampInfo := &topup.Stamp{
+			BatchID:     correctBatchId,
+			Amount:      initialAmount,
+			Utilization: 16,
+			Depth:       20,
+			BucketDepth: 16,
+		}
+		svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.String(), "/stamps/topup/") {
+				mtx.Lock()
+				amount := &big.Int{}
+				amount.SetString(stampInfo.Amount, 10)
+				amount = amount.Add(amount, big.NewInt(10000000))
+				stampInfo.Amount = amount.String()
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(202)
+				_ = json.NewEncoder(w).Encode(&mockResponse{BatchID: stampInfo.BatchID})
+				mtx.Unlock()
+			} else if strings.HasPrefix(r.URL.String(), "/stamps/dilute/") {
+				mtx.Lock()
+				amount := &big.Int{}
+				amount.SetString(stampInfo.Amount, 10)
+				amount = amount.Sub(amount, big.NewInt(5000000))
+				stampInfo.Amount = amount.String()
+				stampInfo.Depth = stampInfo.Depth + 2
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(202)
+				_ = json.NewEncoder(w).Encode(&mockResponse{BatchID: stampInfo.BatchID})
+				mtx.Unlock()
+			} else if strings.HasPrefix(r.URL.String(), "/stamps/") {
+				mtx.Lock()
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(stampInfo)
+				mtx.Unlock()
+			} else {
+				fmt.Println()
+			}
+		}))
+		defer svr.Close()
+		keeper := New(context.Background(), svr.URL, mock.Logging{})
 		cb := func(a *topup.TopupAction) error {
 			// do something with action
 			return nil
@@ -110,7 +151,47 @@ func TestTaskManager(t *testing.T) {
 	})
 
 	t.Run("task actions", func(t *testing.T) {
-		keeper := New(context.Background(), svr.URL, nil)
+		var srvmtx sync.Mutex
+		stampInfo := &topup.Stamp{
+			BatchID:     correctBatchId,
+			Amount:      initialAmount,
+			Utilization: 16,
+			Depth:       20,
+			BucketDepth: 16,
+		}
+		svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.String(), "/stamps/topup/") {
+				srvmtx.Lock()
+				amount := &big.Int{}
+				amount.SetString(stampInfo.Amount, 10)
+				amount = amount.Add(amount, big.NewInt(10000000))
+				stampInfo.Amount = amount.String()
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(202)
+				_ = json.NewEncoder(w).Encode(&mockResponse{BatchID: stampInfo.BatchID})
+				srvmtx.Unlock()
+			} else if strings.HasPrefix(r.URL.String(), "/stamps/dilute/") {
+				srvmtx.Lock()
+				amount := &big.Int{}
+				amount.SetString(stampInfo.Amount, 10)
+				amount = amount.Sub(amount, big.NewInt(5000000))
+				stampInfo.Amount = amount.String()
+				stampInfo.Depth = stampInfo.Depth + 2
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(202)
+				_ = json.NewEncoder(w).Encode(&mockResponse{BatchID: stampInfo.BatchID})
+				srvmtx.Unlock()
+			} else if strings.HasPrefix(r.URL.String(), "/stamps/") {
+				srvmtx.Lock()
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(stampInfo)
+				srvmtx.Unlock()
+			} else {
+				fmt.Println()
+			}
+		}))
+		defer svr.Close()
+		keeper := New(context.Background(), svr.URL, mock.Logging{})
 		actions := []*topup.TopupAction{}
 		var mtx sync.Mutex
 		cb := func(a *topup.TopupAction) error {
@@ -120,12 +201,12 @@ func TestTaskManager(t *testing.T) {
 			actions = append(actions, a)
 			return nil
 		}
-		err := keeper.Watch("batch1", correctBatchId, keeper.url, "10000", "10000000", "10s", cb)
+		err := keeper.Watch("batch1", correctBatchId, keeper.url, "10000", "10000000", "8s", cb)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		<-time.After(time.Second * 8)
+		<-time.After(time.Second * 6)
 		info, err := keeper.GetTaskInfo(correctBatchId)
 		if err != nil {
 			t.Fatal(err)
