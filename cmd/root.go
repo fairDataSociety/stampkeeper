@@ -104,7 +104,7 @@ func Execute() {
 		}
 		if os.Args[1] == "start" {
 			if uds.IsIPCListening(socketPath) {
-				fmt.Println("Datahop daemon is already running")
+				fmt.Println("Stampkeeper is already running")
 				return
 			}
 			_, err := os.Stat(filepath.Join(tmp, sockPath))
